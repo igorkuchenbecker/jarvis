@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M5 concluídos; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0-M6 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -161,6 +161,17 @@
   lib de geração —, freshness por mtime, ingestão de diretório, 2 golden tasks, regressão do bug
   de escape de markup).
 
+### M6 — Embeddings opcionais (avaliado, NÃO adotado)
+- `scripts/benchmark_embeddings.py`: benchmark real FTS5 (produção) vs `fastembed` (ONNX,
+  multilingual-MiniLM) sobre um corpus sintético de 7 trechos/7 consultas em português. Resultado:
+  FTS5 hit@1 6/7, embeddings 7/7 — ganho real porém marginal, não suficiente para justificar a
+  dependência nova num projeto pessoal com corpus tipicamente pequeno. Decisão e números completos
+  em DECISOES.md. Nenhuma mudança de código de produção neste marco — `fastembed` não é dependência
+  do projeto (`pyproject.toml` inalterado).
+- Critério registrado para reavaliar: corpus real crescer o suficiente para o FTS5 errar consultas
+  legítimas com frequência, ou o usuário relatar buscas que deveriam ter encontrado algo por
+  sinônimo/parafraseamento e não encontraram.
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. Três bugs reais foram encontrados e corrigidos validando o M5 na máquina
@@ -217,7 +228,7 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-Seguir para M6 — Embeddings opcionais: avaliar embedding local + rerank; adotar SÓ com ganho
-comprovado sobre FTS5 nas golden tasks de recuperação. DoD: benchmark registrado em DECISOES.md
-(pode concluir "não adotar agora" como resultado válido — o marco pede avaliação, não adoção
-obrigatória).
+Seguir para M7 — Visão: screenshot (`grim`/`hyprshot`, ambiente é Hyprland/Wayland),
+`vision.analyze` via provider multimodal, memória visual mínima. DoD: "o que está na minha tela?"
+respondido corretamente. Isso introduz o primeiro `VisionProvider` do projeto — mesma família de
+interfaces trocáveis por config já usada para LLM (M1) e, futuramente, STT/TTS (M8).

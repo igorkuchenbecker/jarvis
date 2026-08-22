@@ -70,8 +70,9 @@ ruff + mypy --strict + pytest.
 
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
-M5 RAG leve local (concluído) · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz
-(em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
+M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão ·
+M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração
+1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -148,3 +149,13 @@ retroaplicado a `memory.search` do M2), e citações `[arquivo § seção]` send
 por interpretar colchetes como marcação de estilo (`io/cli.py::_seguro()` agora escapa todo
 conteúdo de LLM/ferramentas/auditoria antes de imprimir). Regra prática herdada disto: todo
 `console.print()` novo que interpola conteúdo não escrito por nós precisa passar por `_seguro()`.
+
+## M6 — Embeddings opcionais (avaliado, NÃO adotado)
+
+`scripts/benchmark_embeddings.py` comparou FTS5 (produção) com `fastembed` (ONNX, modelo
+multilíngue pequeno) num corpus sintético desenhado para expor a lacuna léxico-vs-semântico
+(metade das consultas usa sinônimo/parafraseamento sem nenhuma palavra em comum com o trecho
+certo). Resultado real: FTS5 hit@1 6/7, embeddings 7/7 — ganho real mas marginal, insuficiente
+para justificar a dependência nova (`fastembed`+`onnxruntime`+download de modelo) num projeto
+pessoal com corpus tipicamente pequeno. `fastembed` NÃO é dependência do projeto. Critério de
+reavaliação e números completos em `docs/DECISOES.md`.

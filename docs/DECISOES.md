@@ -333,6 +333,34 @@ qualquer novo `console.print()` futuro que interpole texto do LLM/ferramentas/au
 conteúdo que não foi escrito por nós mesmos (resposta do LLM, argumentos de ação, resultado de
 ferramenta, campos de auditoria) precisa passar por `_seguro()` em `io/cli.py`.
 
+---
+
+## M6 — Embeddings opcionais
+
+**2026-08-22** | NÃO adotar embeddings/rerank agora; manter FTS5 (com OR entre termos, já
+corrigido no M5) como único mecanismo de busca do JARVIS | Benchmark real em
+`scripts/benchmark_embeddings.py` (corpus sintético de 7 trechos em português, 7 consultas — 3
+com sobreposição léxica clara, 4 usando sinônimo/parafraseamento sem nenhuma palavra em comum com
+o trecho certo, ex.: "encontro do time" → "alinhamento de equipe"), comparando FTS5 de produção
+contra `fastembed` (ONNX, `paraphrase-multilingual-MiniLM-L12-v2`, ~120MB, sem torch). Resultado:
+**FTS5 hit@1 6/7, embeddings hit@1 7/7** — embeddings ganharam só o único caso de sinônimo puro
+sem NENHUMA palavra compartilhada; nos outros 3 casos "sem sobreposição léxica" o OR do FTS5 (M5)
+já bastou via palavras parcialmente compartilhadas. Ganho real, mas marginal (+1 consulta em 7),
+sobre um corpus pequeno — não a diferença grande que justificaria adicionar uma cadeia de
+dependências nova (`fastembed`+`onnxruntime`, download de modelo do Hugging Face, um índice de
+embeddings para manter sincronizado com o FTS5 a cada ingestão) ao pipeline padrão de um projeto
+pessoal com corpus tipicamente pequeno (`conhecimento.diretorios` é opt-in e vazio por padrão) |
+(a) adotar embeddings como mecanismo único, substituindo FTS5 — rejeitada: perde a vantagem de
+zero-dependência do FTS5 para um ganho de 1/7 no benchmark; (b) adotar embeddings como fallback
+só quando FTS5 retorna vazio — cogitada, mas adiada pela mesma razão de custo/benefício: a lacuna
+que isso fecharia (sinônimo puro, zero overlap léxico) é rara no uso real esperado (notas pessoais
+tendem a reusar o vocabulário da pergunta) | Reavaliar se: (1) o corpus real de conhecimento
+crescer o suficiente para o FTS5 começar a errar consultas legítimas com frequência, ou (2) o
+usuário relatar buscas que claramente deveriam ter encontrado algo e não encontraram por lacuna de
+vocabulário. `scripts/benchmark_embeddings.py` fica no repo para rodar de novo então — não é
+dependência do projeto (`fastembed` não entrou em `pyproject.toml`), só precisa de
+`pip install fastembed` pontualmente para rodar o benchmark.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar
