@@ -29,7 +29,8 @@ Monorepo em `~/jarvis`, layout `src/jarvis/`:
 - `security/` — executor: valida schema, risco, allowlist e jail de caminhos antes de rodar
   qualquer ação. O modelo nunca executa nada diretamente.
 - `memory/` — working (sessão) + persistente em SQLite (episódios, fatos, auditoria) com FTS5
-- `io/` — CLI Rich e personalidade/voz (sem acesso a security)
+- `io/` — CLI Rich, canal de voz (`io/audio.py`: dispositivos, captura, reprodução, corte de
+  silêncio) e personalidade (sem acesso a security)
 - `observability/` — logging estruturado, auditoria JSONL append-only, métricas, tracing
 
 `tests/` (FakeProvider, zero rede) e `tests/golden/*.yaml` (objetivo → ações esperadas →
@@ -69,7 +70,22 @@ ruff + mypy --strict + pytest.
 
 M0 Fundação (concluído) · M1 Core conversacional · M2 Tool calling · M3 Sistema + segurança
 plena · M4 Loop autônomo + goals · M5 RAG leve local · M6 Embeddings (só se benchmark provar
-ganho) · M7 Visão · M8 Voz · M9 Computer use controlado · M10 Integração 1.0.
+ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use
+controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
+
+## M8 — Voz (fatias V0-V4)
+
+Solicitado diretamente antes de M1-M7 existirem. V0 (fundação de áudio) e V1-V2 (STT/TTS) não
+dependem de core loop nem de tools, então avançam normalmente. V3 (conversa por voz ponta-a-ponta)
+foi projetado assumindo um core loop e ferramentas que ainda não existem — decisão registrada em
+`docs/DECISOES.md`: quando V3 chegar, o escopo é reduzido para voz → `LLMProvider` direto (sem
+tool-calling), até M1/M2 serem construídos de verdade.
+
+Fora de escopo nesta missão (registrar como próximos passos, não implementar): wake word, escuta
+contínua, barge-in, hotkey global do Hyprland, streaming de tokens falados, diarização,
+multi-idioma além do pt-BR.
+
+Estado detalhado de qual fatia (V0/V1/V2/V3/V4) está feita: `docs/PROJECT_STATE.md`.

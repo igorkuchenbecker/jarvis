@@ -37,3 +37,12 @@ caminhos:
   banco_dados: ~/jarvis/dados/jarvis.db
   auditoria_jsonl: ~/jarvis/dados/auditoria.jsonl
   logs: ~/jarvis/dados/logs
+
+voz:
+  habilitada: false
+  stt_modelo: small  # tamanho do modelo faster-whisper: tiny|base|small|medium|large-v3
+  dispositivo: auto  # auto = deixa o PortAudio/PipeWire escolher e fazer resample se preciso
+  taxa_amostragem: 16000
+  idioma: pt
+  tts_voz: pt_BR-faber-medium
+
