@@ -68,10 +68,10 @@ ruff + mypy --strict + pytest.
 
 ## Roadmap (resumo)
 
-M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling ·
-M3 Sistema + segurança plena · M4 Loop autônomo + goals · M5 RAG leve local · M6 Embeddings (só
-se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9
-Computer use controlado · M10 Integração 1.0.
+M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
+(concluído) · M3 Sistema + segurança plena · M4 Loop autônomo + goals · M5 RAG leve local · M6
+Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver
+abaixo) · M9 Computer use controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -95,5 +95,16 @@ Estado detalhado de qual fatia (V0/V1/V2/V3/V4) está feita: `docs/PROJECT_STATE
 Também solicitado diretamente, no meio da missão M8 ("quero testar o jarvis em si"). `jarvis` sem
 subcomando agora é uma conversa real de texto com o `ClaudeCliProvider` (via `claude -p`, sem
 tools próprias, com `--system-prompt` mínimo e `--resume` para manter a sessão barata — decisões
-e números de custo reais em `docs/DECISOES.md`). Ainda sem tool-calling (isso é M2): é conversa
-pura, sem o agente agir sobre o sistema.
+e números de custo reais em `docs/DECISOES.md`).
+
+## M2 — Tool calling (concluído)
+
+Protocolo de ação próprio (o LLM responde com JSON `{"tipo":"acao",...}` para agir), executor
+único em `security/executor.py` que valida schema (`security/schema.py`, validador mínimo
+próprio) e jail de caminho (`security/jail.py`) em código antes de rodar qualquer coisa, registro
+declarativo de ferramentas (`tools/registro.py`), `fs.read/write/list` e `memory.store/search`
+(SQLite FTS5). `core/loop.py::processar_turno` encadeia até 12 chamadas de ferramenta por turno —
+é um loop mínimo, não o loop de goals completo do M4. `jarvis` (conversa padrão) já usa isso
+automaticamente. Validado na máquina real: pedido para listar arquivos e salvar nota funcionou
+ponta a ponta, incluindo o executor recusando uma tentativa de caminho fora do jail e o modelo se
+autocorrigindo sozinho.

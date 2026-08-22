@@ -6,7 +6,8 @@ import argparse
 
 from rich.console import Console
 
-from jarvis.core.configuracao import carregar_configuracao
+from jarvis.core.configuracao import Configuracao, carregar_configuracao
+from jarvis.core.loop import processar_turno
 from jarvis.io.audio import (
     AudioIndisponivel,
     dispositivo_entrada_padrao,
@@ -16,11 +17,23 @@ from jarvis.io.audio import (
     listar_dispositivos,
     tocar,
 )
+from jarvis.observability.auditoria import RegistradorAuditoria
 from jarvis.providers import ErroProvider, LLMProvider, criar_provider_llm
+from jarvis.security.executor import Executor
+from jarvis.tools import RegistroFerramentas, criar_registro_ferramentas_padrao
 
 console = Console()
 
 COMANDOS_DE_SAIDA = {"sair", "exit", "quit"}
+
+PROMPT_SISTEMA_COM_FERRAMENTAS = (
+    "Você é o JARVIS, o agente pessoal autônomo do usuário, rodando localmente no Linux dele.\n"
+    "Você pode usar ferramentas para agir de verdade no sistema. Para usar uma, responda SOMENTE "
+    'com um JSON exatamente neste formato, sem nenhum texto antes ou depois:\n'
+    '{{"tipo": "acao", "ferramenta": "<nome>", "argumentos": {{...}}}}\n'
+    "Ferramentas disponíveis:\n{ferramentas}\n"
+    "Se não precisar de nenhuma ferramenta, responda normalmente em texto, direto e conciso."
+)
 
 
 def principal() -> None:
@@ -44,17 +57,33 @@ def _construir_analisador() -> argparse.ArgumentParser:
     return analisador
 
 
+def _montar_prompt_sistema(registro: RegistroFerramentas) -> str:
+    return PROMPT_SISTEMA_COM_FERRAMENTAS.format(ferramentas=registro.descrever_para_prompt())
+
+
+def _construir_executor(configuracao: Configuracao) -> tuple[RegistroFerramentas, Executor]:
+    registro = criar_registro_ferramentas_padrao(configuracao)
+    auditoria = RegistradorAuditoria(configuracao.caminhos.auditoria_jsonl)
+    executor = Executor(
+        registro,
+        jail_paths=list(configuracao.seguranca.jail_paths),
+        auditoria=auditoria,
+    )
+    return registro, executor
+
+
 def _comando_padrao(argumentos: argparse.Namespace) -> None:
     configuracao = carregar_configuracao()
+    registro, executor = _construir_executor(configuracao)
     try:
-        provider = criar_provider_llm(configuracao)
+        provider = criar_provider_llm(configuracao, prompt_sistema=_montar_prompt_sistema(registro))
     except ErroProvider as erro:
         console.print(f"[bold red]erro:[/bold red] {erro}")
         return
-    _executar_conversa(provider)
+    _executar_conversa(provider, executor)
 
 
-def _executar_conversa(provider: LLMProvider) -> None:
+def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) -> None:
     console.print(
         "[bold cyan]JARVIS[/bold cyan] — modo conversa. "
         "Digite 'sair' (ou Ctrl+C/Ctrl+D) para encerrar, 'reiniciar' para começar do zero.\n"
@@ -77,12 +106,18 @@ def _executar_conversa(provider: LLMProvider) -> None:
             continue
 
         try:
-            resposta = provider.enviar(texto_usuario)
+            if executor is None:
+                resposta_final = provider.enviar(texto_usuario)
+            else:
+                turno = processar_turno(provider, executor, texto_usuario)
+                for acao in turno.acoes_executadas:
+                    console.print(f"[dim]→ executou {acao.ferramenta}({acao.argumentos})[/dim]")
+                resposta_final = turno.resposta_final
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
             continue
 
-        console.print(f"[bold magenta]jarvis>[/bold magenta] {resposta}\n")
+        console.print(f"[bold magenta]jarvis>[/bold magenta] {resposta_final}\n")
 
 
 def _comando_voz_check(argumentos: argparse.Namespace) -> None:

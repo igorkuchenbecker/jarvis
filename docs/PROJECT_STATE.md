@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0 concluído; M1 concluído fora de ordem; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0, M1, M2 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -55,6 +55,40 @@
   `claude` falso gerado nos testes, loop de conversa do CLI) — nenhum toca rede, CLI real ou custa
   dinheiro.
 
+### M2 — Tool calling
+- `security/schema.py`: `validar_schema()` — validador mínimo próprio (object/properties/
+  required/additionalProperties + tipos básicos), não a lib `jsonschema` (ver DECISOES.md).
+- `security/jail.py`: `resolver_dentro_do_jail()` — bloqueia travessia (`..`), caminho absoluto
+  fora do jail e symlink que escapa do jail, via `Path.resolve()`.
+- `security/executor.py`: `Executor`/`Acao`/`ResultadoAcao` — única porta de entrada para rodar
+  ferramentas: valida schema, valida jail para os `campos_caminho` da ferramenta, executa, captura
+  erros, registra em auditoria (sucesso ou erro), e suporta `reverter()` para ferramentas com
+  `capturar_estado`/`reverter` (usado por `fs.write`).
+- `tools/base.py`: `Ferramenta`/`NivelRisco` (READ_ONLY<LOW<MEDIUM<HIGH<CRITICAL — só READ_ONLY
+  e LOW usados até aqui). `tools/registro.py`: `RegistroFerramentas` (registrar/obter/todas/
+  descrever_para_prompt).
+- `tools/fs.py`: `fs.read`, `fs.list` (READ_ONLY), `fs.write` (LOW, com rollback real).
+- `memory/armazenamento.py`: `RepositorioMemoria` sobre SQLite FTS5 (tabela virtual única
+  `memorias`). `tools/memoria.py`: `memory.store` (LOW), `memory.search` (READ_ONLY).
+- `tools/__init__.py`: `criar_registro_ferramentas_padrao()` monta o registro com fs+memória.
+- `core/loop.py`: `processar_turno()` — laço mínimo de tool-calling (até 12 iterações): o LLM
+  responde com JSON `{"tipo":"acao",...}` para agir, ou texto normal para responder; NÃO é o loop
+  de goals do M4 (sem decomposição/replanning/checkpoint) — ver DECISOES.md.
+- `io/cli.py`: `jarvis` (conversa padrão) agora monta o registro + executor automaticamente e usa
+  `processar_turno`; mostra no terminal quais ferramentas rodaram (`→ executou fs.list(...)`).
+- `core/configuracao.py`: `Configuracao` ganhou `seguranca.jail_paths` e
+  `caminhos.workspace/banco_dados/auditoria_jsonl`, lidos de `config.yaml` quando presente.
+- Testado na máquina real com a CLI `claude` de verdade: pedi "liste os arquivos do meu workspace
+  e depois salve uma nota na memória dizendo quais arquivos encontrou". O modelo tentou primeiro
+  `fs.list(".")` (fora do jail — **recusado pelo executor**), corrigiu sozinho para o caminho
+  absoluto, listou `exemplo.txt`, chamou `memory.store` e respondeu corretamente. Confirmado nos
+  três lugares: saída do terminal, `~/jarvis/dados/auditoria.jsonl` (mostra a recusa e os dois
+  sucessos) e `~/jarvis/dados/jarvis.db` (texto realmente persistido, consultado via `sqlite3`).
+- 71 testes no total (33 novos: schema, jail — incluindo travessia e symlink maliciosos —,
+  executor — incluindo ferramenta desconhecida, schema inválido, travessia maliciosa, rollback —,
+  memória FTS5, registro de ferramentas, `processar_turno`). Nenhum toca rede, CLI real ou custa
+  dinheiro.
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
@@ -70,16 +104,22 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Dívida técnica
 
-- Ainda não existe core loop de agente (percepção→plano→ação→observação, M4), nem ferramentas
-  (`fs.*`, `memory.*`) nem executor de ações (M2/M3) — a conversa do M1 é só ida-e-volta de texto
-  com o LLM, sem tool-calling. Isso é relevante para o M8: a fatia V3 (conversa por voz
-  ponta-a-ponta) foi projetada para depender do "mesmo core loop do chat textual" e de "ferramentas
-  já existentes"; agora existe uma conversa textual real para religar, mas ainda sem ferramentas —
-  decisão em DECISOES.md permanece: V3 usa `LLMProvider` direto, sem tool-calling, até M2 existir.
-- `config.yaml.example` só é lido parcialmente: `provedor.llm_padrao`/`provedor.claude_cli.*` já
-  são usados por `carregar_configuracao()`; `autonomia`, `limites`, `seguranca`, `caminhos` e `voz`
-  ainda não têm código que os leia.
-- `jarvis.db` (SQLite) ainda não existe.
+- Autonomia 0-5 do config.yaml ainda não é lida/aplicada por código nenhum — o executor roda
+  READ_ONLY/LOW sempre, sem checar `autonomia.nivel`. Isso é explicitamente escopo do M3
+  ("autonomia 0–5 funcional"), não dívida do M2 (decisão registrada: M2 não antecipa essa peça).
+- Nenhuma ferramenta de risco MEDIUM/HIGH/CRITICAL existe ainda (proc.kill, terminal.exec,
+  sys.info — M3), então o caminho de aprovação humana interativa para HIGH/CRITICAL (regra fixa
+  do projeto) ainda não tem código nenhum — não há o que aprovar ainda.
+- `jarvis audit`/`jarvis why` (M3) não existem — hoje só dá pra inspecionar
+  `~/jarvis/dados/auditoria.jsonl` na mão.
+- Isso é relevante para o M8: a fatia V3 (conversa por voz ponta-a-ponta) foi projetada para
+  depender do "mesmo core loop do chat textual" e de "ferramentas já existentes" — agora ambos
+  existem (M1+M2), então V3 pode religar de verdade ao `processar_turno` com ferramentas, não mais
+  precisar do escopo reduzido registrado antes em DECISOES.md. Revisitar aquela decisão quando V3
+  for retomado.
+- `config.yaml.example`: `autonomia`, `limites` e `voz` ainda não têm código que os leia (`voz`
+  é lido só pela documentação, o `io/audio.py` do M8 ainda não consulta config). `provedor.*`,
+  `seguranca.jail_paths` e `caminhos.*` já são lidos.
 - `AnthropicProvider`/`OpenAICompatProvider` não implementados; `criar_provider_llm()` só aceita
   `llm_padrao: claude_cli` por enquanto (qualquer outro valor levanta `ErroProvider`).
 - Streaming (`stream-json`) não implementado — `ClaudeCliProvider` usa `--output-format json`
@@ -89,8 +129,8 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-A definir com o usuário: retomar M8 pela fatia V1 (STT/faster-whisper) como planejado antes da
-pausa para M1, ou seguir para M2 (tool calling) agora que a conversa real está funcionando e faz
-mais sentido religar ferramentas a ela. Nenhuma decisão tomada ainda — esperar sinal do usuário na
-próxima sessão em vez de escolher sozinho, já que as duas direções têm o mesmo peso no roadmap
-original e a escolha é mais sobre prioridade de produto do que sobre arquitetura.
+Seguir para M3 — Sistema + segurança plena: `sys.info`, `proc.list`, `proc.kill` (HIGH),
+`terminal.exec` com allowlist, aplicar `autonomia.nivel` de verdade no executor (bloqueando/
+liberando conforme o nível, com HIGH/CRITICAL sempre exigindo aprovação humana interativa,
+independente do nível), `jarvis audit` e `jarvis why`. DoD do M3: cenários de risco bloqueados
+ou liberados exatamente conforme config.

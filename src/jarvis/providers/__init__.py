@@ -9,10 +9,18 @@ from jarvis.providers.claude_cli import ClaudeCliProvider
 __all__ = ["ClaudeCliProvider", "ErroProvider", "LLMProvider", "criar_provider_llm"]
 
 
-def criar_provider_llm(configuracao: Configuracao) -> LLMProvider:
+def criar_provider_llm(
+    configuracao: Configuracao, prompt_sistema: str | None = None
+) -> LLMProvider:
     if configuracao.llm_padrao == "claude_cli":
+        if prompt_sistema is None:
+            return ClaudeCliProvider(
+                binario=configuracao.claude_cli.binario,
+                timeout_segundos=configuracao.claude_cli.timeout_segundos,
+            )
         return ClaudeCliProvider(
             binario=configuracao.claude_cli.binario,
             timeout_segundos=configuracao.claude_cli.timeout_segundos,
+            prompt_sistema=prompt_sistema,
         )
     raise ErroProvider(f"provedor de LLM '{configuracao.llm_padrao}' ainda não é suportado")

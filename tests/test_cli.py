@@ -8,6 +8,7 @@ from jarvis.io import cli
 from jarvis.io.audio import DispositivoAudio
 from jarvis.providers.base import ErroProvider
 from jarvis.providers.fake import FakeProvider
+from jarvis.tools import RegistroFerramentas
 
 
 def _entradas(*textos: str) -> Any:
@@ -23,7 +24,12 @@ def test_comando_padrao_inicia_conversa_com_o_provider_configurado(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(cli, "carregar_configuracao", lambda: Configuracao())
-    monkeypatch.setattr(cli, "criar_provider_llm", lambda configuracao: FakeProvider(["oi!"]))
+    monkeypatch.setattr(
+        cli, "_construir_executor", lambda configuracao: (RegistroFerramentas(), None)
+    )
+    monkeypatch.setattr(
+        cli, "criar_provider_llm", lambda configuracao, prompt_sistema=None: FakeProvider(["oi!"])
+    )
     monkeypatch.setattr(cli.console, "input", _entradas("olá", "sair"))
 
     analisador = cli._construir_analisador()
@@ -36,10 +42,15 @@ def test_comando_padrao_inicia_conversa_com_o_provider_configurado(
 def test_comando_padrao_mostra_erro_amigavel_quando_provider_nao_disponivel(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    def _criar_provider_com_erro(configuracao: Configuracao) -> FakeProvider:
+    def _criar_provider_com_erro(
+        configuracao: Configuracao, prompt_sistema: str | None = None
+    ) -> FakeProvider:
         raise ErroProvider("binário não encontrado")
 
     monkeypatch.setattr(cli, "carregar_configuracao", lambda: Configuracao())
+    monkeypatch.setattr(
+        cli, "_construir_executor", lambda configuracao: (RegistroFerramentas(), None)
+    )
     monkeypatch.setattr(cli, "criar_provider_llm", _criar_provider_com_erro)
 
     cli._comando_padrao(argparse.Namespace())

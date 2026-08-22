@@ -11,3 +11,5 @@ __pycache__/
 *.jsonl
 config.yaml
 .DS_Store
+/workspace/
+/dados/

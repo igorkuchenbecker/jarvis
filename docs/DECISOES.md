@@ -131,6 +131,71 @@ e `provedor.claude_cli.*` são lidas por enquanto — as demais seções de `con
 (autonomia, limites, segurança, voz) ainda não têm código que as leia; ler quando o marco
 correspondente (M2/M3/M8-V1+) precisar delas.
 
+---
+
+## M2 — Tool calling
+
+**2026-08-22** | Validação de schema de argumentos é um validador próprio, mínimo, em
+`security/schema.py` (object/properties/required/additionalProperties + tipos
+string/integer/number/boolean/array/object), em vez da biblioteca `jsonschema` | As 5 ferramentas
+do M2 (`fs.read/write/list`, `memory.store/search`) têm schemas simples e planos — sem `$ref`,
+`oneOf`, `anyOf` ou schemas aninhados complexos. `jsonschema` traria uma cadeia de dependências
+(hoje inclui `referencing`, `rpds-py`/`attrs` dependendo da versão) desproporcional ao que é
+realmente validado | Adotar `jsonschema` desde já, prevendo schemas mais ricos no futuro —
+rejeitada por "simplicidade vence sofisticação aparente" (regra do projeto): YAGNI até uma
+ferramenta futura realmente precisar de uma feature de JSON Schema que o validador próprio não
+cobre; nesse momento, reavaliar | Se/quando uma ferramenta precisar de schema aninhado ou
+validação condicional, essa é a hora de trocar para `jsonschema` — não antes.
+
+**2026-08-22** | Jail de caminho (`security/jail.py`) usa `Path.resolve()` (segue symlinks,
+normaliza `..`) e compara com `Path.parents`/igualdade contra as raízes autorizadas — testado com
+um teste malicioso de symlink apontando para fora do jail (bloqueado) e travessia `../..`
+(bloqueada) | É o invariante mais importante do M2 ("O modelo nunca executa nada... validação é
+código no executor, nunca prompt") logo precisa ser a coisa mais testada do marco. Confirmado na
+máquina real: ao pedir "liste os arquivos do meu workspace", o modelo tentou primeiro
+`fs.list(".")` (resolvendo para `~/jarvis`, fora do jail) — o executor recusou automaticamente e o
+modelo corrigiu sozinho para o caminho absoluto correto na tentativa seguinte, sem que nenhuma
+instrução de prompt tivesse pedido isso — prova de que a validação em código funciona
+independentemente do que o modelo "decida" fazer | N/A (não há alternativa razoável a
+`resolve()` + comparação de caminho para este problema).
+
+**2026-08-22** | O tool-calling do M2 usa um protocolo textual próprio: o LLM responde com um JSON
+`{"tipo": "acao", "ferramenta": "...", "argumentos": {...}}` quando quer agir, verificado por
+`core/loop.py::processar_turno` (até 12 iterações por turno, mesmo teto de
+`limites.max_iteracoes_por_objetivo` do config.yaml.example) — não o tool-calling nativo da API
+Anthropic (`tool_use`/`tool_result` blocks) | O `ClaudeCliProvider` fala com a CLI `claude`, que já
+tem sua própria noção de "ferramentas" (que desligamos com `--tools=` desde o M1, exatamente para
+que o JARVIS seja quem decide o que roda). Usar `tool_use` nativo exigiria trocar de arquitetura
+de provider (SDK direto, não mais `claude -p`) e contrariaria a decisão já tomada no M1 de usar a
+CLI com a assinatura existente | Aguardar o `AnthropicProvider` (SDK) para ter tool-calling nativo
+— rejeitada porque adiaria o M2 inteiro para depois de um marco que nem está no roadmap ainda |
+Quando o `AnthropicProvider` existir, ele pode oferecer tool-calling nativo por baixo do mesmo
+`LLMProvider`/`processar_turno`, ou `processar_turno` pode ganhar um modo nativo — decidir então,
+não agora.
+
+**2026-08-22** | `core/loop.py::processar_turno` implementa só o laço "chamar ferramenta → ver
+resultado → chamar de novo ou responder", sem decomposição em subtarefas, replanning ou
+checkpoint em SQLite (isso é M4) | O DoD do M2 ("liste os arquivos e salve uma nota ponta a
+ponta") já exige encadear 2 ações antes de uma resposta final, o que não dá pra fazer com uma
+chamada única ao LLM — mas não exige nada do que M4 promete (retomada pós-crash, critérios de
+sucesso/falha por subtarefa, replanning) | Implementar o M4 completo agora, já que "o loop" está
+sendo tocado — rejeitada por escopo: o roadmap separa isso de propósito, e a versão mínima já
+resolve o problema do M2 sem antecipar trabalho que merece ser feito com cuidado próprio | Quando
+M4 chegar, `processar_turno` provavelmente vira uma peça interna de um loop maior com goals,
+persistência de estado e replanning — não descartar, evoluir.
+
+**2026-08-22** | `memory.store`/`memory.search` gravam em uma única tabela virtual FTS5
+(`memorias(texto, criado_em UNINDEXED)`), sem distinguir "fatos" de "episódios" ainda, apesar da
+seção MEMÓRIA do master prompt descrever as duas categorias separadamente | M2 pede só
+"memory.search/store" como ferramentas — a distinção fatos-vs-episódios e a regra "fatos só
+gravados com comando explícito 'lembre que...'" são comportamento do LLM/core (o que decide
+quando chamar `memory.store`), não uma restrição que o executor deva codificar; modelar isso
+agora seria adivinhar uma necessidade que ainda não apareceu | Criar tabelas separadas
+`fatos`/`episodios` desde já — rejeitada por YAGNI: sem um caso de uso concreto ainda para
+diferenciá-las na busca, uma tabela única já cumpre "busca textual com FTS5" | Se/quando a
+distinção importar (ex.: o RAG do M5 precisar separar memória de documentos ingeridos), revisitar
+o schema da tabela.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar
