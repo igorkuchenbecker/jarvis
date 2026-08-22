@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from rich.console import Console
+from rich.table import Table
 
 from jarvis.core.configuracao import Configuracao, carregar_configuracao
 from jarvis.core.loop import processar_turno
@@ -19,8 +20,9 @@ from jarvis.io.audio import (
 )
 from jarvis.observability.auditoria import RegistradorAuditoria
 from jarvis.providers import ErroProvider, LLMProvider, criar_provider_llm
-from jarvis.security.executor import Executor
+from jarvis.security.executor import Acao, Executor
 from jarvis.tools import RegistroFerramentas, criar_registro_ferramentas_padrao
+from jarvis.tools.base import Ferramenta
 
 console = Console()
 
@@ -54,11 +56,35 @@ def _construir_analisador() -> argparse.ArgumentParser:
     )
     comando_voz_check.set_defaults(funcao=_comando_voz_check)
 
+    comando_audit = subcomandos.add_parser(
+        "audit", help="lista as últimas ações registradas em auditoria"
+    )
+    comando_audit.add_argument("--limite", type=int, default=20)
+    comando_audit.set_defaults(funcao=_comando_audit)
+
+    comando_why = subcomandos.add_parser(
+        "why", help="explica uma ação da auditoria pelo número (1 = mais recente)"
+    )
+    comando_why.add_argument("indice", type=int)
+    comando_why.set_defaults(funcao=_comando_why)
+
     return analisador
 
 
 def _montar_prompt_sistema(registro: RegistroFerramentas) -> str:
     return PROMPT_SISTEMA_COM_FERRAMENTAS.format(ferramentas=registro.descrever_para_prompt())
+
+
+def _solicitar_aprovacao_interativa(acao: Acao, ferramenta: Ferramenta) -> bool:
+    console.print(
+        f"[bold yellow]aprovação necessária[/bold yellow] — {acao.ferramenta} "
+        f"(risco {ferramenta.risco.name}) com argumentos {acao.argumentos}"
+    )
+    try:
+        resposta = console.input("[bold yellow]permitir? (s/N)[/bold yellow] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return resposta in {"s", "sim", "y", "yes"}
 
 
 def _construir_executor(configuracao: Configuracao) -> tuple[RegistroFerramentas, Executor]:
@@ -67,6 +93,9 @@ def _construir_executor(configuracao: Configuracao) -> tuple[RegistroFerramentas
     executor = Executor(
         registro,
         jail_paths=list(configuracao.seguranca.jail_paths),
+        allowlist_binarios=configuracao.seguranca.allowlist_binarios,
+        nivel_autonomia=configuracao.autonomia.nivel,
+        solicitar_aprovacao=_solicitar_aprovacao_interativa,
         auditoria=auditoria,
     )
     return registro, executor
@@ -145,6 +174,49 @@ def _comando_voz_check(argumentos: argparse.Namespace) -> None:
         console.print("[bold green]beep tocado com sucesso[/bold green]")
     except AudioIndisponivel as erro:
         console.print(f"[bold red]erro ao tocar beep:[/bold red] {erro}")
+
+
+def _comando_audit(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+    registrador = RegistradorAuditoria(configuracao.caminhos.auditoria_jsonl)
+    registros = list(reversed(registrador.ler_todos()))[: argumentos.limite]
+
+    if not registros:
+        console.print("[dim]nenhum registro de auditoria ainda.[/dim]")
+        return
+
+    tabela = Table()
+    tabela.add_column("#")
+    tabela.add_column("quando")
+    tabela.add_column("ação")
+    tabela.add_column("resultado")
+    tabela.add_column("duração (s)")
+    for indice, registro in enumerate(registros, start=1):
+        tabela.add_row(
+            str(indice),
+            registro.quando,
+            registro.acao,
+            registro.resultado,
+            f"{registro.duracao_segundos:.3f}",
+        )
+    console.print(tabela)
+
+
+def _comando_why(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+    registrador = RegistradorAuditoria(configuracao.caminhos.auditoria_jsonl)
+    registros = list(reversed(registrador.ler_todos()))
+
+    if argumentos.indice < 1 or argumentos.indice > len(registros):
+        console.print(f"[bold red]erro:[/bold red] não há registro #{argumentos.indice}")
+        return
+
+    registro = registros[argumentos.indice - 1]
+    console.print(f"[bold]#{argumentos.indice}[/bold] {registro.acao} em {registro.quando}")
+    console.print(f"argumentos: {registro.argumentos_seguros}")
+    console.print(f"resultado: {registro.resultado}")
+    console.print(f"duração: {registro.duracao_segundos:.3f}s")
+    console.print(f"custo estimado: US${registro.custo_estimado_usd:.4f}")
 
 
 if __name__ == "__main__":

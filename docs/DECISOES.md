@@ -196,6 +196,49 @@ diferenciá-las na busca, uma tabela única já cumpre "busca textual com FTS5" 
 distinção importar (ex.: o RAG do M5 precisar separar memória de documentos ingeridos), revisitar
 o schema da tabela.
 
+---
+
+## M3 — Sistema + segurança plena
+
+**2026-08-22** | Mapa fixo de teto de risco por nível de autonomia
+(`TETO_RISCO_POR_AUTONOMIA = {0: nenhum, 1: READ_ONLY, 2: LOW, 3: MEDIUM, 4: MEDIUM, 5: MEDIUM}`),
+e HIGH/CRITICAL SEMPRE passam por um callback de aprovação humana interativa, nunca liberados só
+por autonomia alta | Regra fixa do próprio AGENTS.md ("HIGH/CRITICAL exigem aprovação humana
+interativa sempre, independentemente do nível de autonomia"). Autonomia 4/5 ("tarefas longas
+autônomas"/"alta autonomia sob política estrita") descrevem duração/escopo da tarefa, não uma
+licença para pular aprovação em ações de risco alto — por isso o teto de auto-execução não sobe
+além de MEDIUM em nenhum nível | Deixar nível 5 auto-executar HIGH sem aprovação — rejeitada por
+contrariar regra explícita do projeto, não é uma decisão de engenharia aberta | Testado com 7
+combinações (nível × risco) mais os 3 cenários de aprovação (sem callback, callback nega,
+callback aprova) — os dois últimos validados também na máquina real com `proc.kill` de verdade
+(processo morto quando aprovado, mantido vivo quando negado).
+
+**2026-08-22** | Sem callback de aprovação configurado, ação HIGH/CRITICAL é RECUSADA por padrão
+(fail-closed), não liberada | Não há UI para perguntar em todo contexto que usa o `Executor`
+(ex.: um golden test do M4, ou um script) — na ausência de alguém para perguntar, a escolha segura
+é nunca executar, nunca a de assumir "sim" | Executar por padrão quando não há callback —
+rejeitada por violar o princípio de segurança mais básico do projeto (fail-safe) | `io/cli.py`
+fornece `_solicitar_aprovacao_interativa` (prompt real no terminal) como o único callback real
+hoje; qualquer novo canal de E/S (voz, uma futura UI) precisa fornecer o seu.
+
+**2026-08-22** | `terminal.exec` nunca usa `shell=True`; argumentos vão como lista para
+`subprocess.run`, ambiente reduzido a `PATH`/`HOME`/`LANG` (não repassa o ambiente do processo do
+JARVIS) e `sudo`/`su`/`doas`/`pkexec` são recusados no código do executor mesmo que apareçam na
+allowlist do config.yaml por engano | `shell=True` seria injeção de comando por design (a essência
+do que "sem sudo" e "allowlist" tentam evitar); repassar o ambiente inteiro do JARVIS a um binário
+arbitrário da allowlist arriscaria vazar segredos (ex.: se um dia houver uma API key em variável de
+ambiente) | Repassar `os.environ` inteiro para conveniência — rejeitada por superfície de vazamento
+desnecessária; permitir configurar `shell=True` como opção — rejeitada, nunca deveria existir |
+Testado com metacaracteres de shell (`$(whoami)`, `; ls`) confirmando que chegam literais ao
+`echo`, não interpretados.
+
+**2026-08-22** | `sys.info`/`proc.list` usam só stdlib + `/proc` (Linux), sem adicionar `psutil` |
+O projeto é Linux-first (CachyOS) por decisão de ambiente já registrada no M0; `/proc/meminfo`,
+`/proc/uptime`, `/proc/<pid>/comm` e `os.statvfs`/`os.getloadavg` cobrem tudo que essas duas
+ferramentas precisam sem nenhuma dependência nova | Adicionar `psutil` para código mais portável
+entre SOs — rejeitada por YAGNI: o projeto não tem meta de rodar em outro SO, e stdlib+`/proc` já
+resolve | Se um dia houver meta de portabilidade (não há hoje), essa é a hora de reavaliar.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar

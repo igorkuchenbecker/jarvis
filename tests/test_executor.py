@@ -112,6 +112,116 @@ def test_registra_auditoria_de_sucesso_e_erro(tmp_path: Path) -> None:
     assert "erro" in registros[0].resultado
 
 
+def _registro_com_ferramenta_de_risco(risco: NivelRisco) -> RegistroFerramentas:
+    registro = RegistroFerramentas()
+    registro.registrar(
+        Ferramenta(
+            nome="teste.arriscada",
+            descricao="",
+            risco=risco,
+            schema_argumentos={"type": "object", "properties": {}},
+            executar=lambda argumentos: "executou",
+        )
+    )
+    return registro
+
+
+@pytest.mark.parametrize(
+    ("nivel_autonomia", "risco", "deveria_rodar"),
+    [
+        (0, NivelRisco.READ_ONLY, False),
+        (1, NivelRisco.READ_ONLY, True),
+        (1, NivelRisco.LOW, False),
+        (2, NivelRisco.LOW, True),
+        (2, NivelRisco.MEDIUM, False),
+        (3, NivelRisco.MEDIUM, True),
+        (5, NivelRisco.MEDIUM, True),
+    ],
+)
+def test_teto_de_risco_por_nivel_de_autonomia(
+    tmp_path: Path, nivel_autonomia: int, risco: NivelRisco, deveria_rodar: bool
+) -> None:
+    executor = Executor(
+        _registro_com_ferramenta_de_risco(risco),
+        jail_paths=[tmp_path],
+        nivel_autonomia=nivel_autonomia,
+    )
+
+    resultado = executor.executar_acao(Acao("teste.arriscada", {}))
+
+    assert resultado.sucesso is deveria_rodar
+    if not deveria_rodar:
+        assert "autonomia" in (resultado.erro or "")
+
+
+def test_ferramenta_high_sem_callback_de_aprovacao_e_recusada_por_padrao(tmp_path: Path) -> None:
+    executor = Executor(
+        _registro_com_ferramenta_de_risco(NivelRisco.HIGH),
+        jail_paths=[tmp_path],
+        nivel_autonomia=5,
+    )
+
+    resultado = executor.executar_acao(Acao("teste.arriscada", {}))
+
+    assert not resultado.sucesso
+    assert "aprovação" in (resultado.erro or "")
+
+
+def test_ferramenta_high_e_recusada_mesmo_com_autonomia_maxima_se_callback_negar(
+    tmp_path: Path,
+) -> None:
+    executor = Executor(
+        _registro_com_ferramenta_de_risco(NivelRisco.HIGH),
+        jail_paths=[tmp_path],
+        nivel_autonomia=5,
+        solicitar_aprovacao=lambda acao, ferramenta: False,
+    )
+
+    resultado = executor.executar_acao(Acao("teste.arriscada", {}))
+
+    assert not resultado.sucesso
+
+
+def test_ferramenta_high_roda_quando_callback_aprova(tmp_path: Path) -> None:
+    executor = Executor(
+        _registro_com_ferramenta_de_risco(NivelRisco.HIGH),
+        jail_paths=[tmp_path],
+        nivel_autonomia=0,
+        solicitar_aprovacao=lambda acao, ferramenta: True,
+    )
+
+    resultado = executor.executar_acao(Acao("teste.arriscada", {}))
+
+    assert resultado.sucesso
+    assert resultado.valor == "executou"
+
+
+def test_recusa_binario_fora_da_allowlist(tmp_path: Path) -> None:
+    registro = RegistroFerramentas()
+    registro.registrar(
+        Ferramenta(
+            nome="teste.exec",
+            descricao="",
+            risco=NivelRisco.MEDIUM,
+            schema_argumentos={
+                "type": "object",
+                "properties": {"comando": {"type": "string"}},
+                "required": ["comando"],
+            },
+            executar=lambda argumentos: "rodou",
+            campo_binario="comando",
+        )
+    )
+    executor = Executor(
+        registro, jail_paths=[tmp_path], allowlist_binarios=("git",), nivel_autonomia=3
+    )
+
+    resultado = executor.executar_acao(Acao("teste.exec", {"comando": "curl"}))
+
+    assert not resultado.sucesso
+    assert "allowlist" in (resultado.erro or "")
+
+
 def test_ferramenta_sem_suporte_a_reverter_levanta_erro(tmp_path: Path) -> None:
     registro = RegistroFerramentas()
     registro.registrar(

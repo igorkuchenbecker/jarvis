@@ -69,9 +69,9 @@ ruff + mypy --strict + pytest.
 ## Roadmap (resumo)
 
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
-(concluído) · M3 Sistema + segurança plena · M4 Loop autônomo + goals · M5 RAG leve local · M6
-Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver
-abaixo) · M9 Computer use controlado · M10 Integração 1.0.
+(concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals · M5 RAG leve
+local · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de
+ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -108,3 +108,15 @@ declarativo de ferramentas (`tools/registro.py`), `fs.read/write/list` e `memory
 automaticamente. Validado na máquina real: pedido para listar arquivos e salvar nota funcionou
 ponta a ponta, incluindo o executor recusando uma tentativa de caminho fora do jail e o modelo se
 autocorrigindo sozinho.
+
+## M3 — Sistema + segurança plena (concluído)
+
+`sys.info`/`proc.list` (READ_ONLY, stdlib+`/proc`), `proc.kill` (HIGH), `terminal.exec` (MEDIUM,
+sem `shell=True`, allowlist de binário, `sudo`/`su`/`doas`/`pkexec` sempre proibidos mesmo que
+apareçam na allowlist). Autonomia 0-5 agora é aplicada de verdade no `Executor`
+(`TETO_RISCO_POR_AUTONOMIA`): READ_ONLY/LOW/MEDIUM liberados conforme o nível, HIGH/CRITICAL
+SEMPRE passam por aprovação humana interativa (`io/cli.py::_solicitar_aprovacao_interativa`),
+recusados por padrão se não houver ninguém para perguntar (fail-closed). `jarvis audit`/
+`jarvis why <n>` inspecionam a auditoria. Validado na máquina real: `terminal.exec` (MEDIUM, só liberado a partir do nível 3) bloqueado no
+nível de autonomia padrão (2), e `proc.kill` real aprovado/negado interativamente matando ou
+preservando um processo de teste de verdade.

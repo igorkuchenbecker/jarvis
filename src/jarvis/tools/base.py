@@ -29,5 +29,6 @@ class Ferramenta:
     schema_argumentos: dict[str, Any]
     executar: Callable[[dict[str, Any]], Any]
     campos_caminho: tuple[str, ...] = ()
+    campo_binario: str | None = None
     capturar_estado: Callable[[dict[str, Any]], Any] | None = None
     reverter: Callable[[dict[str, Any], Any], None] | None = None

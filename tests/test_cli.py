@@ -1,11 +1,13 @@
 import argparse
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from jarvis.core.configuracao import Configuracao
+from jarvis.core.configuracao import Configuracao, ConfiguracaoCaminhos
 from jarvis.io import cli
 from jarvis.io.audio import DispositivoAudio
+from jarvis.observability.auditoria import RegistradorAuditoria, RegistroAuditoria
 from jarvis.providers.base import ErroProvider
 from jarvis.providers.fake import FakeProvider
 from jarvis.tools import RegistroFerramentas
@@ -153,6 +155,81 @@ def test_voz_check_toca_beep_quando_ha_dispositivos(
     assert "speaker falso" in saida
     assert "beep tocado com sucesso" in saida
     assert chamadas_tocar == [None]
+
+
+def test_audit_lista_registros_mais_recentes_primeiro(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    caminho_auditoria = tmp_path / "auditoria.jsonl"
+    registrador = RegistradorAuditoria(caminho_auditoria)
+    registrador.registrar(
+        RegistroAuditoria("fs.read", {}, "sucesso", 0.01, quando="2026-01-01T00:00:00")
+    )
+    registrador.registrar(
+        RegistroAuditoria("fs.write", {}, "sucesso", 0.02, quando="2026-01-02T00:00:00")
+    )
+    monkeypatch.setattr(
+        cli,
+        "carregar_configuracao",
+        lambda: Configuracao(caminhos=ConfiguracaoCaminhos(auditoria_jsonl=caminho_auditoria)),
+    )
+
+    cli._comando_audit(argparse.Namespace(limite=20))
+
+    saida = capsys.readouterr().out
+    assert saida.index("fs.write") < saida.index("fs.read")
+
+
+def test_audit_sem_registros_nao_quebra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "carregar_configuracao",
+        lambda: Configuracao(
+            caminhos=ConfiguracaoCaminhos(auditoria_jsonl=tmp_path / "auditoria.jsonl")
+        ),
+    )
+
+    cli._comando_audit(argparse.Namespace(limite=20))
+
+    assert "nenhum registro" in capsys.readouterr().out
+
+
+def test_why_mostra_detalhes_do_registro_pedido(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    caminho_auditoria = tmp_path / "auditoria.jsonl"
+    registrador = RegistradorAuditoria(caminho_auditoria)
+    registrador.registrar(RegistroAuditoria("fs.read", {"caminho": "a.txt"}, "sucesso", 0.01))
+    registrador.registrar(RegistroAuditoria("fs.write", {"caminho": "b.txt"}, "sucesso", 0.02))
+    monkeypatch.setattr(
+        cli,
+        "carregar_configuracao",
+        lambda: Configuracao(caminhos=ConfiguracaoCaminhos(auditoria_jsonl=caminho_auditoria)),
+    )
+
+    cli._comando_why(argparse.Namespace(indice=1))
+
+    saida = capsys.readouterr().out
+    assert "fs.write" in saida
+    assert "b.txt" in saida
+
+
+def test_why_indice_invalido_mostra_erro_amigavel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "carregar_configuracao",
+        lambda: Configuracao(
+            caminhos=ConfiguracaoCaminhos(auditoria_jsonl=tmp_path / "auditoria.jsonl")
+        ),
+    )
+
+    cli._comando_why(argparse.Namespace(indice=1))
+
+    assert "erro" in capsys.readouterr().out
 
 
 def test_voz_check_avisa_sem_quebrar_quando_nao_ha_microfone(

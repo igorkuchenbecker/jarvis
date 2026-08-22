@@ -65,4 +65,14 @@ def test_criar_registro_ferramentas_padrao_inclui_fs_e_memoria(tmp_path: Path) -
     registro = criar_registro_ferramentas_padrao(configuracao)
 
     nomes = {ferramenta.nome for ferramenta in registro.todas()}
-    assert {"fs.read", "fs.write", "fs.list", "memory.store", "memory.search"} <= nomes
+    assert {
+        "fs.read",
+        "fs.write",
+        "fs.list",
+        "memory.store",
+        "memory.search",
+        "sys.info",
+        "proc.list",
+        "proc.kill",
+        "terminal.exec",
+    } <= nomes

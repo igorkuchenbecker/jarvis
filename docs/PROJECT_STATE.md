@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0, M1, M2 concluídos; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0, M1, M2, M3 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -89,6 +89,33 @@
   memória FTS5, registro de ferramentas, `processar_turno`). Nenhum toca rede, CLI real ou custa
   dinheiro.
 
+### M3 — Sistema + segurança plena
+- `core/configuracao.py`: `Configuracao` ganhou `autonomia.nivel` e
+  `limites.timeout_por_passo_segundos`; `seguranca` ganhou `allowlist_binarios`.
+- `security/allowlist.py`: `validar_binario_permitido()` — recusa binário fora da allowlist E
+  recusa `sudo`/`su`/`doas`/`pkexec` sempre, mesmo que apareçam na allowlist do config.
+- `security/executor.py`: `Executor` ganhou `nivel_autonomia`, `allowlist_binarios` e
+  `solicitar_aprovacao` (callback). Teto de risco auto-executado por nível de autonomia
+  (`TETO_RISCO_POR_AUTONOMIA`); HIGH/CRITICAL sempre passam pelo callback de aprovação,
+  independente do nível — sem callback, recusado por padrão (fail-closed).
+- `tools/sistema.py`: `sys.info` (READ_ONLY, stdlib+`/proc`), `proc.list` (READ_ONLY),
+  `proc.kill` (HIGH, sinal SIGTERM/SIGKILL/SIGINT), `terminal.exec` (MEDIUM, sem `shell=True`,
+  ambiente sanitizado, timeout obrigatório, saída truncada em 4000 caracteres).
+- `io/cli.py`: `_solicitar_aprovacao_interativa()` — prompt real no terminal para ações
+  HIGH/CRITICAL; novos comandos `jarvis audit [--limite N]` (tabela Rich) e `jarvis why <indice>`
+  (detalhe de um registro, 1 = mais recente).
+- Testado na máquina real: (1) `jarvis audit`/`jarvis why 3` mostrando o histórico real do M2;
+  (2) pedir para rodar `git status` via `terminal.exec` no nível de autonomia padrão (2) foi
+  **bloqueado automaticamente** ("nível de autonomia atual (2) não permite ações de risco
+  MEDIUM"), e o modelo explicou isso ao usuário; (3) pedir para matar um processo real
+  (`sleep 300` de teste) disparou o prompt de aprovação — aprovando com "s" o processo morreu de
+  verdade (confirmado com `ps`), negando com "n" o processo continuou vivo (confirmado com `ps`).
+- 101 testes no total (30 novos: allowlist, ferramentas de sistema — incluindo matar um processo
+  real de teste e truncamento de saída —, gate de autonomia parametrizado em 7 combinações,
+  aprovação HIGH nos 3 cenários, `jarvis audit`/`jarvis why`). Nenhum toca rede ou custa dinheiro;
+  os testes de `sys.info`/`proc.*`/`terminal.exec` tocam processos/disco reais isolados (mesmo
+  padrão já usado para `fs.*` com `tmp_path`).
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
@@ -104,14 +131,12 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Dívida técnica
 
-- Autonomia 0-5 do config.yaml ainda não é lida/aplicada por código nenhum — o executor roda
-  READ_ONLY/LOW sempre, sem checar `autonomia.nivel`. Isso é explicitamente escopo do M3
-  ("autonomia 0–5 funcional"), não dívida do M2 (decisão registrada: M2 não antecipa essa peça).
-- Nenhuma ferramenta de risco MEDIUM/HIGH/CRITICAL existe ainda (proc.kill, terminal.exec,
-  sys.info — M3), então o caminho de aprovação humana interativa para HIGH/CRITICAL (regra fixa
-  do projeto) ainda não tem código nenhum — não há o que aprovar ainda.
-- `jarvis audit`/`jarvis why` (M3) não existem — hoje só dá pra inspecionar
-  `~/jarvis/dados/auditoria.jsonl` na mão.
+- CRITICAL não tem nenhuma ferramenta ainda (nada no roadmap até aqui precisa desse nível) — o
+  caminho de aprovação já cobre CRITICAL igual a HIGH no código, mas está sem exercício real.
+- `jarvis why` identifica o registro pelo índice de exibição (1 = mais recente), não por um ID
+  estável — se novas ações forem registradas entre um `jarvis audit` e um `jarvis why N`, o índice
+  pode já apontar para outro registro. Aceitável para uso interativo (index visto na hora), mas
+  não é uma referência estável entre sessões.
 - Isso é relevante para o M8: a fatia V3 (conversa por voz ponta-a-ponta) foi projetada para
   depender do "mesmo core loop do chat textual" e de "ferramentas já existentes" — agora ambos
   existem (M1+M2), então V3 pode religar de verdade ao `processar_turno` com ferramentas, não mais
@@ -129,8 +154,8 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-Seguir para M3 — Sistema + segurança plena: `sys.info`, `proc.list`, `proc.kill` (HIGH),
-`terminal.exec` com allowlist, aplicar `autonomia.nivel` de verdade no executor (bloqueando/
-liberando conforme o nível, com HIGH/CRITICAL sempre exigindo aprovação humana interativa,
-independente do nível), `jarvis audit` e `jarvis why`. DoD do M3: cenários de risco bloqueados
-ou liberados exatamente conforme config.
+Seguir para M4 — Loop autônomo + goals: planner com decomposição em subtarefas (dependências,
+critérios de sucesso/falha), replanning, checkpoints em SQLite, retomada pós-crash,
+`jarvis run "<objetivo>"`. Isso evolui `core/loop.py::processar_turno` (hoje um laço de uma
+ferramenta por vez, sem estado persistido) para algo que sobrevive a um crash do processo e
+persegue um objetivo multi-passo declarado, não só responde a uma mensagem por vez.
