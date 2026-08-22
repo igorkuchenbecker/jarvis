@@ -1,0 +1,39 @@
+# Copie para config.yaml e ajuste. config.yaml nunca é versionado.
+
+autonomia:
+  nivel: 2  # 0=só responde 1=sugere 2=executa LOW no workspace 3=workflows aprovados 4=tarefas longas 5=alta autonomia
+
+provedor:
+  llm_padrao: claude_cli  # claude_cli | anthropic | openai_compat | fake
+  claude_cli:
+    binario: claude
+    timeout_segundos: 120
+    formato_saida: stream-json
+  anthropic:
+    modelo: claude-sonnet-5
+    max_tokens: 8192
+  openai_compat:
+    base_url: http://localhost:11434/v1
+    modelo: llama3
+
+limites:
+  max_iteracoes_por_objetivo: 12
+  timeout_por_passo_segundos: 60
+  teto_tokens_por_objetivo: 200000
+  teto_custo_usd_por_objetivo: 1.0
+
+seguranca:
+  jail_paths:
+    - ~/jarvis/workspace
+  allowlist_binarios:
+    - ls
+    - cat
+    - rg
+    - git
+    - fd
+
+caminhos:
+  workspace: ~/jarvis/workspace
+  banco_dados: ~/jarvis/dados/jarvis.db
+  auditoria_jsonl: ~/jarvis/dados/auditoria.jsonl
+  logs: ~/jarvis/dados/logs
