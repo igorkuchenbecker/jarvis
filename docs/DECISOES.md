@@ -361,6 +361,40 @@ vocabulário. `scripts/benchmark_embeddings.py` fica no repo para rodar de novo 
 dependência do projeto (`fastembed` não entrou em `pyproject.toml`), só precisa de
 `pip install fastembed` pontualmente para rodar o benchmark.
 
+---
+
+## M7 — Visão
+
+**2026-08-22** | `ClaudeCliVisionProvider` usa `claude -p --input-format stream-json
+--output-format stream-json --verbose --tools=`, enviando a imagem como bloco `{"type":"image",
+"source":{"type":"base64",...}}` via stdin (mesmo formato de conteúdo da API Messages) | Testado
+manualmente que a CLI aceita isso (real, não documentado explicitamente no `--help`); é o único
+jeito de mandar uma imagem para o `claude -p` sem depender das ferramentas nativas dele (que estão
+desligadas por `--tools=` desde o M1, de propósito). Cada chamada é sessão nova, sem `--resume` —
+análise de imagem não é uma conversa contínua | **Bug real corrigido em produção**: a primeira
+versão esqueceu a flag `--verbose`, exigida pela própria CLI junto com
+`--output-format=stream-json` em modo `-p`; sem ela, a chamada falha antes de processar a imagem.
+Só apareceu testando de verdade na máquina (o `claude` falso dos testes automatizados não impõe
+essa exigência da CLI real) — o próprio LLM, ao receber a mensagem de erro da CLI real no primeiro
+teste, diagnosticou a causa raiz corretamente antes de mim.
+
+**2026-08-22 (correção de privacidade, achada testando o DoD na máquina real)** |
+`vision.analyze` NÃO persiste nada na memória automaticamente — a versão original gravava um
+resumo de CADA captura de tela em `memory.store` sem o usuário pedir ("memória visual mínima" do
+roadmap foi interpretada errado inicialmente). Isso persistiu de verdade um resumo de uma conversa
+real de WhatsApp (nomes de contatos, um pedido de empréstimo) na primeira execução manual — dado
+sensível, removido manualmente do banco assim que percebido | Isso contraria a própria regra do
+projeto ("fatos... grava SÓ com comando explícito 'lembre que...'"): gravar automaticamente como
+efeito colateral de uma ferramenta classificada READ_ONLY é exatamente o tipo de escrita
+não-consentida que essa regra existe para proibir | Manter auto-save com opt-in via
+`config.yaml` — considerada e rejeitada: mesmo opt-in, o padrão errado (gravar tudo que passa na
+tela) é perigoso o suficiente para não valer a complexidade extra; se o usuário quiser lembrar de
+algo visto na tela, pode pedir explicitamente e o LLM chama `memory.store` normalmente, do jeito
+que já funciona para qualquer outra informação | `criar_ferramentas_visao()` nem aceita mais um
+`RepositorioMemoria` como parâmetro — a regra fica garantida pela própria assinatura da função,
+não só por convenção; teste de regressão confirma que passar um segundo argumento levanta
+`TypeError`.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar

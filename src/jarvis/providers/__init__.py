@@ -1,12 +1,20 @@
-"""Providers de LLM (e, no futuro, STT/TTS/visão) do JARVIS — trocáveis via config.yaml."""
+"""Providers de LLM/visão (e, no futuro, STT/TTS) do JARVIS — trocáveis via config.yaml."""
 
 from __future__ import annotations
 
 from jarvis.core.configuracao import Configuracao
-from jarvis.providers.base import ErroProvider, LLMProvider
-from jarvis.providers.claude_cli import ClaudeCliProvider
+from jarvis.providers.base import ErroProvider, LLMProvider, VisionProvider
+from jarvis.providers.claude_cli import ClaudeCliProvider, ClaudeCliVisionProvider
 
-__all__ = ["ClaudeCliProvider", "ErroProvider", "LLMProvider", "criar_provider_llm"]
+__all__ = [
+    "ClaudeCliProvider",
+    "ClaudeCliVisionProvider",
+    "ErroProvider",
+    "LLMProvider",
+    "VisionProvider",
+    "criar_provider_llm",
+    "criar_provider_visao",
+]
 
 
 def criar_provider_llm(
@@ -24,3 +32,12 @@ def criar_provider_llm(
             prompt_sistema=prompt_sistema,
         )
     raise ErroProvider(f"provedor de LLM '{configuracao.llm_padrao}' ainda não é suportado")
+
+
+def criar_provider_visao(configuracao: Configuracao) -> VisionProvider:
+    if configuracao.llm_padrao == "claude_cli":
+        return ClaudeCliVisionProvider(
+            binario=configuracao.claude_cli.binario,
+            timeout_segundos=configuracao.claude_cli.timeout_segundos,
+        )
+    raise ErroProvider(f"provedor de visão para '{configuracao.llm_padrao}' ainda não é suportado")

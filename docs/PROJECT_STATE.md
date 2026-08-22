@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M6 concluídos; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0-M7 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -172,9 +172,29 @@
   legítimas com frequência, ou o usuário relatar buscas que deveriam ter encontrado algo por
   sinônimo/parafraseamento e não encontraram.
 
+### M7 — Visão
+- `io/tela.py`: `capturar_tela()` via `grim` (Wayland/wlroots), binário e timeout configuráveis.
+- `providers/base.py`: `VisionProvider` (Protocol: `analisar(caminho_imagem, pergunta) -> str`).
+- `providers/claude_cli.py`: `ClaudeCliVisionProvider` — envia a imagem em base64 via
+  `--input-format stream-json`/`--output-format stream-json --verbose` (formato de blocos de
+  conteúdo da API Messages); `providers/fake.py`: `FakeVisionProvider` para testes.
+- `tools/visao.py`: `vision.analyze` (READ_ONLY) — captura a tela, analisa, apaga a captura do
+  disco em seguida. NÃO persiste nada na memória automaticamente (ver Bugs conhecidos).
+- Testado na máquina real: "o que está na minha tela?" respondido corretamente descrevendo o
+  conteúdo real da tela (duas vezes, incluindo depois da correção do `--verbose`).
+- 12 testes novos (captura real com `grim` + erros com binário falso/inexistente/lento,
+  `ClaudeCliVisionProvider` com um `claude` falso incluindo verificação de que a imagem em
+  base64 chega no stdin, ferramenta `vision.analyze` incluindo a regressão de não-persistência).
+
 ## Bugs conhecidos
 
-- Nenhum bug aberto. Três bugs reais foram encontrados e corrigidos validando o M5 na máquina
+- Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com
+  `--output-format=stream-json` em modo `-p`) no `ClaudeCliVisionProvider` — corrigido; e a
+  primeira versão de `vision.analyze` persistia automaticamente um resumo de cada captura de tela
+  na memória sem pedido do usuário (chegou a gravar dados pessoais reais numa execução manual,
+  removidos manualmente) — corrigido removendo a persistência automática por completo (ver
+  DECISOES.md, é uma correção de privacidade, não só um bug técnico).
+- No M5: três bugs reais foram encontrados e corrigidos validando o M5 na máquina
   real (nenhum apareceu nos testes automatizados até então — ver DECISOES.md para os três):
   (1) coluna `secao` do FTS5 estava `UNINDEXED`, então palavras que só apareciam no título de uma
   seção markdown eram invisíveis à busca; (2) consultas FTS5 usavam AND implícito entre termos,
@@ -228,7 +248,8 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-Seguir para M7 — Visão: screenshot (`grim`/`hyprshot`, ambiente é Hyprland/Wayland),
-`vision.analyze` via provider multimodal, memória visual mínima. DoD: "o que está na minha tela?"
-respondido corretamente. Isso introduz o primeiro `VisionProvider` do projeto — mesma família de
-interfaces trocáveis por config já usada para LLM (M1) e, futuramente, STT/TTS (M8).
+M0-M7 concluídos nesta sessão (M1/M8-V0 fora de ordem, a pedido do usuário; M6 concluído como
+"avaliado, não adotado"). Sessão pausada a pedido do usuário logo após a correção de privacidade
+do M7. Não decidido ainda: retomar M8 pelas fatias V1-V4 (STT/TTS/voz ponta-a-ponta, cujo escopo
+de V3 pode agora ser o completo, com tool-calling, já que M1+M2 existem) ou seguir M9 (Computer
+use controlado). Esperar sinal do usuário na próxima sessão.

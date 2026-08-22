@@ -70,9 +70,9 @@ ruff + mypy --strict + pytest.
 
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
-M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão ·
-M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração
-1.0.
+M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão
+(concluído) · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado ·
+M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -159,3 +159,15 @@ certo). Resultado real: FTS5 hit@1 6/7, embeddings 7/7 — ganho real mas margin
 para justificar a dependência nova (`fastembed`+`onnxruntime`+download de modelo) num projeto
 pessoal com corpus tipicamente pequeno. `fastembed` NÃO é dependência do projeto. Critério de
 reavaliação e números completos em `docs/DECISOES.md`.
+
+## M7 — Visão (concluído)
+
+`io/tela.py::capturar_tela()` (via `grim`) + `VisionProvider`/`ClaudeCliVisionProvider` (imagem em
+base64 via `claude -p --input-format stream-json --output-format stream-json --verbose --tools=`)
++ ferramenta `vision.analyze` (READ_ONLY). Validado na máquina real: "o que está na minha tela?"
+respondido corretamente. **Importante, correção de privacidade**: `vision.analyze` NÃO persiste
+nada na memória automaticamente — a primeira versão gravava um resumo de cada captura sem pedido
+do usuário e chegou a persistir dados pessoais reais numa execução manual (removidos assim que
+percebido). A API de `criar_ferramentas_visao()` nem aceita mais um repositório de memória, por
+decisão explícita registrada em `docs/DECISOES.md`. Se o usuário quiser lembrar de algo visto na
+tela, o LLM usa `memory.store` normalmente, por pedido explícito — nunca automático.

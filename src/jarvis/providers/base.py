@@ -1,12 +1,13 @@
-"""Interface comum a todo provider de LLM do JARVIS — trocável via config.yaml."""
+"""Interfaces comuns a providers do JARVIS — trocáveis via config.yaml."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 
 class ErroProvider(Exception):
-    """Levantada quando um provider de LLM falha ao responder, de forma amigável para o usuário."""
+    """Levantada quando um provider falha ao responder, de forma amigável para o usuário."""
 
 
 class LLMProvider(Protocol):
@@ -16,4 +17,10 @@ class LLMProvider(Protocol):
 
     def reiniciar(self) -> None:
         """Descarta o histórico da sessão corrente e começa uma nova do zero."""
+        ...
+
+
+class VisionProvider(Protocol):
+    def analisar(self, caminho_imagem: Path, pergunta: str) -> str:
+        """Analisa uma imagem local e responde à pergunta sobre ela, sem manter sessão."""
         ...
