@@ -9,6 +9,8 @@ from rich.table import Table
 
 from jarvis.core.configuracao import Configuracao, carregar_configuracao
 from jarvis.core.loop import processar_turno
+from jarvis.core.objetivos import RepositorioObjetivos
+from jarvis.core.planejador import executar_objetivo
 from jarvis.io.audio import (
     AudioIndisponivel,
     dispositivo_entrada_padrao,
@@ -67,6 +69,12 @@ def _construir_analisador() -> argparse.ArgumentParser:
     )
     comando_why.add_argument("indice", type=int)
     comando_why.set_defaults(funcao=_comando_why)
+
+    comando_run = subcomandos.add_parser(
+        "run", help="persegue um objetivo multi-passo, com replanning e checkpoint"
+    )
+    comando_run.add_argument("objetivo", type=str)
+    comando_run.set_defaults(funcao=_comando_run)
 
     return analisador
 
@@ -174,6 +182,39 @@ def _comando_voz_check(argumentos: argparse.Namespace) -> None:
         console.print("[bold green]beep tocado com sucesso[/bold green]")
     except AudioIndisponivel as erro:
         console.print(f"[bold red]erro ao tocar beep:[/bold red] {erro}")
+
+
+def _comando_run(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+    registro, executor = _construir_executor(configuracao)
+    try:
+        provider = criar_provider_llm(configuracao, prompt_sistema=_montar_prompt_sistema(registro))
+    except ErroProvider as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+
+    repositorio = RepositorioObjetivos(configuracao.caminhos.banco_dados)
+
+    def _mostrar_progresso(mensagem: str) -> None:
+        console.print(f"[dim]→ {mensagem}[/dim]")
+
+    try:
+        resultado = executar_objetivo(
+            provider, executor, repositorio, argumentos.objetivo, ao_progredir=_mostrar_progresso
+        )
+    except ErroProvider as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+
+    if resultado.estado == "concluido":
+        console.print(
+            f"[bold green]objetivo concluído[/bold green] "
+            f"({len(resultado.subtarefas)} subtarefa(s))"
+        )
+    else:
+        console.print(
+            "[bold red]objetivo não concluído[/bold red] — replanejamentos esgotados"
+        )
 
 
 def _comando_audit(argumentos: argparse.Namespace) -> None:

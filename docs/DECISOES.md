@@ -239,6 +239,45 @@ ferramentas precisam sem nenhuma dependência nova | Adicionar `psutil` para có
 entre SOs — rejeitada por YAGNI: o projeto não tem meta de rodar em outro SO, e stdlib+`/proc` já
 resolve | Se um dia houver meta de portabilidade (não há hoje), essa é a hora de reavaliar.
 
+---
+
+## M4 — Loop autônomo + goals
+
+**2026-08-22** | Sucesso/falha de subtarefa é decidido pelo próprio texto da resposta final do
+LLM (`SUCESSO: ...` / `FALHA: ...`, checado por substring), não por um juiz separado nem por
+critério estruturado avaliado em código | Um segundo "juiz" chamaria o LLM de novo (mais uma
+chamada paga por subtarefa) só para reformular o que a própria resposta final já deveria dizer se
+o system prompt pedir claramente; avaliação estruturada em código exigiria que cada subtarefa
+declarasse um critério de sucesso *verificável mecanicamente*, o que nem sempre é possível
+(critérios de sucesso aqui são texto livre gerado pelo planejador, não uma assertion) | Um
+segundo LLM-juiz avaliando cada resultado — rejeitada por dobrar o custo por subtarefa sem ganho
+claro de confiabilidade sobre simplesmente pedir o protocolo SUCESSO/FALHA no prompt | Validado
+tanto em teste determinístico (`FakeProvider` roteirizado com FALHA seguida de replanning) quanto
+na máquina real.
+
+**2026-08-22** | Checkpoint é salvo por SUBTAREFA concluída (ou a cada replanejamento), não a
+cada iteração de ferramenta dentro de `processar_turno` | "a cada passo" no master prompt é
+ambíguo entre "passo do objetivo" (subtarefa) e "passo do loop de ferramentas" (iteração); a
+granularidade por subtarefa já garante que um crash no meio de um objetivo de N subtarefas perde
+no máximo o trabalho da subtarefa corrente, não o objetivo inteiro — e evita reescrever o SQLite a
+cada chamada de ferramenta (uma subtarefa pode envolver várias) | Checkpoint por iteração de
+ferramenta — rejeitada por granularidade desproporcional ao ganho: se uma subtarefa falhar no
+meio, ela é refeita do zero de qualquer forma (ela não é dividida em sub-passos retomáveis) | Se
+subtarefas muito longas (muitas iterações de ferramenta) se tornarem comuns, reavaliar
+granularidade então.
+
+**2026-08-22** | `executar_objetivo` retoma automaticamente QUALQUER objetivo com
+`estado='em_andamento'` que encontrar no banco (não pede confirmação, não compara a descrição do
+objetivo pedido agora com a do objetivo salvo) | M4 assume um objetivo em andamento por vez (não
+há fila de objetivos concorrentes ainda); isso é exatamente o comportamento de "retomada pós-crash"
+pedido no DoD — rodar `jarvis run` de novo após um crash deve continuar o que já estava rodando,
+não perguntar | Comparar descrição antes de retomar, e começar um novo objetivo do zero se
+diferente — rejeitada por escopo: com um único objetivo em andamento por vez, a pergunta "é o
+mesmo objetivo?" não faz sentido ainda; only passa a fazer sentido com múltiplos objetivos
+concorrentes, o que não está no roadmap do M4 | Testado com um cenário de "crash" simulado
+(reabrir o repositório com uma nova conexão e um `FakeProvider` sem histórico) que retoma
+exatamente na subtarefa certa, sem replanejar nem re-executar a subtarefa já concluída.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar

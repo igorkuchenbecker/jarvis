@@ -69,9 +69,9 @@ ruff + mypy --strict + pytest.
 ## Roadmap (resumo)
 
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
-(concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals · M5 RAG leve
-local · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de
-ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
+(concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
+M5 RAG leve local · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em
+andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -120,3 +120,14 @@ recusados por padrão se não houver ninguém para perguntar (fail-closed). `jar
 `jarvis why <n>` inspecionam a auditoria. Validado na máquina real: `terminal.exec` (MEDIUM, só liberado a partir do nível 3) bloqueado no
 nível de autonomia padrão (2), e `proc.kill` real aprovado/negado interativamente matando ou
 preservando um processo de teste de verdade.
+
+## M4 — Loop autônomo + goals (concluído)
+
+`core/planejador.py::executar_objetivo` — decompõe um objetivo em subtarefas (LLM responde JSON
+`{"tipo":"plano",...}`), roda cada uma com `processar_turno` do M2, decide sucesso/falha pelo
+prefixo `SUCESSO:`/`FALHA:` da resposta, replaneja o restante se falhar (até 3 vezes por padrão).
+Checkpoint em SQLite (`core/objetivos.py::RepositorioObjetivos`) a cada subtarefa concluída —
+`jarvis run` retoma automaticamente um objetivo `em_andamento` encontrado no banco, sem replanejar
+nem re-executar o que já passou (retomada pós-crash). `jarvis run "<objetivo>"` no CLI. Validado
+com testes determinísticos (`FakeProvider`) cobrindo replanning e retomada pós-crash, e na máquina
+real com um objetivo de 3 subtarefas usando `memory.store`/`memory.search`.

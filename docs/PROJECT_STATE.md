@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0, M1, M2, M3 concluídos; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0-M4 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -116,6 +116,26 @@
   os testes de `sys.info`/`proc.*`/`terminal.exec` tocam processos/disco reais isolados (mesmo
   padrão já usado para `fs.*` com `tmp_path`).
 
+### M4 — Loop autônomo + goals
+- `core/objetivos.py`: `RepositorioObjetivos`/`Subtarefa`/`ObjetivoPersistido` — SQLite (tabela
+  `objetivos`), checkpoint (`salvar_checkpoint`) a cada subtarefa concluída ou replanejamento,
+  `obter_em_andamento()` para retomada pós-crash.
+- `core/planejador.py`: `planejar()` (LLM decompõe um objetivo em subtarefas via protocolo JSON
+  `{"tipo":"plano",...}`), `executar_objetivo()` — roda cada subtarefa com `processar_turno`,
+  decide sucesso/falha pelo prefixo `SUCESSO:`/`FALHA:` da resposta final, replaneja o restante em
+  caso de falha (até `max_replanejamentos`, padrão 3), persiste checkpoint a cada progresso.
+- `io/cli.py`: `jarvis run "<objetivo>"` — mostra o progresso subtarefa a subtarefa no terminal.
+- Testado na máquina real: `jarvis run "salve uma nota... e depois busque por essa nota..."`
+  decompôs em 3 subtarefas (store, search, confirmar), executou todas com sucesso; confirmado nos
+  três lugares — saída do terminal, checkpoint no SQLite (`objetivos`, estado `concluido`,
+  3 subtarefas `concluida`) e a nota realmente gravada em `memorias` (FTS5).
+- 15 testes novos, incluindo os dois cenários exigidos pelo DoD, ambos determinísticos com
+  `FakeProvider`: **replanning** (subtarefa falha → LLM replaneja → nova subtarefa tenta de outro
+  jeito → sucesso) e **retomada pós-crash** (reabre o repositório com uma nova conexão e um
+  `FakeProvider` sem histórico algum, e o objetivo continua exatamente na subtarefa onde parou,
+  sem replanejar nem re-executar a subtarefa já concluída — confirmado checando que o provider
+  novo recebeu só 1 chamada).
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
@@ -152,10 +172,19 @@ confirmada por um humano ao rodar `jarvis voz check`.
 - STT (`WhisperSTTProvider`), TTS (`PiperTTSProvider`) e o modo `jarvis voz` (M8/V1-V4) ainda não
   foram implementados.
 
+## Dívida técnica (M4)
+
+- Um único objetivo "em_andamento" por vez é suportado (ver decisão em DECISOES.md) — não há fila
+  de objetivos concorrentes nem comparação de descrição ao retomar.
+- Subtarefas não têm dependências explícitas entre si (a decomposição do LLM já as ordena
+  sequencialmente, mas não há um grafo de dependências declarado nem paralelismo).
+- `jarvis run` não tem um jeito de listar/cancelar um objetivo em andamento (só continua ou
+  esgota `max_replanejamentos`).
+
 ## Próximo passo
 
-Seguir para M4 — Loop autônomo + goals: planner com decomposição em subtarefas (dependências,
-critérios de sucesso/falha), replanning, checkpoints em SQLite, retomada pós-crash,
-`jarvis run "<objetivo>"`. Isso evolui `core/loop.py::processar_turno` (hoje um laço de uma
-ferramenta por vez, sem estado persistido) para algo que sobrevive a um crash do processo e
-persegue um objetivo multi-passo declarado, não só responde a uma mensagem por vez.
+Seguir para M5 — Conhecimento local (RAG leve): ingestão de `.md`/`.txt`/`.pdf` de diretórios
+autorizados, chunking por cabeçalhos, FTS5 (provavelmente reaproveitando `memory/armazenamento.py`
+ou uma tabela irmã), citação `[arquivo § seção]`, freshness por mtime. DoD: perguntas sobre
+`~/Documentos` respondidas com citação correta nas golden tasks (`tests/golden/*.yaml`, ainda não
+existentes — este marco também introduz o primeiro golden task real do projeto).
