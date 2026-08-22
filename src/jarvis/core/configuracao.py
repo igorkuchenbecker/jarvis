@@ -38,6 +38,11 @@ class ConfiguracaoSeguranca:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoConhecimento:
+    diretorios: tuple[Path, ...] = ()
+
+
+@dataclass(frozen=True)
 class ConfiguracaoCaminhos:
     workspace: Path = field(default_factory=lambda: RAIZ_JARVIS_PADRAO / "workspace")
     banco_dados: Path = field(default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "jarvis.db")
@@ -54,6 +59,7 @@ class Configuracao:
     limites: ConfiguracaoLimites = field(default_factory=ConfiguracaoLimites)
     seguranca: ConfiguracaoSeguranca = field(default_factory=ConfiguracaoSeguranca)
     caminhos: ConfiguracaoCaminhos = field(default_factory=ConfiguracaoCaminhos)
+    conhecimento: ConfiguracaoConhecimento = field(default_factory=ConfiguracaoConhecimento)
 
 
 def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao:
@@ -67,6 +73,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     limites_brutos = bruto.get("limites") or {}
     seguranca_bruta = bruto.get("seguranca") or {}
     caminhos_brutos = bruto.get("caminhos") or {}
+    conhecimento_bruto = bruto.get("conhecimento") or {}
 
     padroes_caminhos = ConfiguracaoCaminhos()
     padroes_seguranca = ConfiguracaoSeguranca()
@@ -108,5 +115,10 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             auditoria_jsonl=Path(
                 caminhos_brutos.get("auditoria_jsonl", str(padroes_caminhos.auditoria_jsonl))
             ).expanduser(),
+        ),
+        conhecimento=ConfiguracaoConhecimento(
+            diretorios=tuple(
+                Path(item).expanduser() for item in conhecimento_bruto.get("diretorios", [])
+            ),
         ),
     )

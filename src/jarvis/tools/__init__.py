@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from jarvis.core.configuracao import Configuracao
 from jarvis.memory.armazenamento import RepositorioMemoria
+from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.tools.base import Ferramenta, NivelRisco
+from jarvis.tools.conhecimento import criar_ferramentas_conhecimento
 from jarvis.tools.fs import criar_ferramentas_fs
 from jarvis.tools.memoria import criar_ferramentas_memoria
 from jarvis.tools.registro import RegistroFerramentas
@@ -28,6 +30,10 @@ def criar_registro_ferramentas_padrao(configuracao: Configuracao) -> RegistroFer
         registro.registrar(ferramenta)
 
     for ferramenta in criar_ferramentas_sistema(configuracao.limites.timeout_por_passo_segundos):
+        registro.registrar(ferramenta)
+
+    repositorio_conhecimento = RepositorioConhecimento(configuracao.caminhos.banco_dados)
+    for ferramenta in criar_ferramentas_conhecimento(repositorio_conhecimento):
         registro.registrar(ferramenta)
 
     return registro

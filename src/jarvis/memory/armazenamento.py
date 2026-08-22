@@ -6,6 +6,8 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from jarvis.memory._fts5 import construir_consulta_fts5
+
 
 class RepositorioMemoria:
     def __init__(self, caminho_banco: Path) -> None:
@@ -27,7 +29,7 @@ class RepositorioMemoria:
         try:
             cursor = self._conexao.execute(
                 "SELECT texto FROM memorias WHERE memorias MATCH ? ORDER BY rank LIMIT ?",
-                (consulta, limite),
+                (construir_consulta_fts5(consulta), limite),
             )
         except sqlite3.OperationalError:
             return []

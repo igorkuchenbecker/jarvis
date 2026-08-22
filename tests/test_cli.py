@@ -85,6 +85,20 @@ def test_executar_conversa_encerra_limpo_com_eof(
     cli._executar_conversa(FakeProvider([]))  # não deve lançar
 
 
+def test_executar_conversa_nao_engole_colchetes_da_resposta_do_llm(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Regressão: Console.print() do Rich trata `[algo]` como marcação de estilo por padrão e
+    engolia silenciosamente citações como `[arquivo § seção]` vindas do LLM (achado real no M5).
+    """
+    monkeypatch.setattr(cli.console, "input", _entradas("oi", "sair"))
+    provider = FakeProvider(["conforme [notas.md § Instalação], rode X"])
+
+    cli._executar_conversa(provider)
+
+    assert "[notas.md § Instalação]" in capsys.readouterr().out
+
+
 def test_executar_conversa_ignora_linhas_vazias(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

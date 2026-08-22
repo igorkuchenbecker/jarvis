@@ -1,0 +1,25 @@
+nome: citacao_conhecimento
+objetivo: "onde encontro as instruções de instalação nas minhas notas?"
+
+documentos:
+  - arquivo: notas.md
+    conteudo: |
+      # Introdução
+
+      Texto geral sobre o projeto.
+
+      ## Instalação
+
+      Para instalar, rode `pip install jarvis`.
+
+respostas_llm:
+  - '{"tipo": "acao", "ferramenta": "conhecimento.buscar", "argumentos": {"consulta": "instalação"}}'
+  - "De acordo com [notas.md § Instalação], para instalar rode `pip install jarvis`."
+
+acoes_esperadas:
+  - ferramenta: conhecimento.buscar
+    argumentos:
+      consulta: instalação
+
+resposta_contem:
+  - "[notas.md § Instalação]"

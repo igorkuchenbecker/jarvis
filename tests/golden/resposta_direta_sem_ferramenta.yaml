@@ -1,0 +1,12 @@
+nome: resposta_direta_sem_ferramenta
+objetivo: "qual é a capital do brasil?"
+
+documentos: []
+
+respostas_llm:
+  - "Brasília é a capital do Brasil."
+
+acoes_esperadas: []
+
+resposta_contem:
+  - "Brasília"

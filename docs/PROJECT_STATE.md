@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M4 concluídos; M8/V0 — Fundação de áudio)
+**Versão:** 0.1.0 (M0-M5 concluídos; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -136,9 +136,43 @@
   sem replanejar nem re-executar a subtarefa já concluída — confirmado checando que o provider
   novo recebeu só 1 chamada).
 
+### M5 — Conhecimento local (RAG leve)
+- `memory/conhecimento.py`: `RepositorioConhecimento` (SQLite FTS5) — ingestão de `.md` (chunking
+  por cabeçalho), `.txt` (arquivo inteiro), `.pdf` (por página, via `pypdf`); atualização por
+  mtime (arquivo sem mudança não é reindexado); `Trecho.citacao()` → `[arquivo § seção]`.
+- `memory/_fts5.py`: `construir_consulta_fts5()` — consulta OR entre termos, usada por
+  `armazenamento.py` (M2) e `conhecimento.py` (M5). Ver "bugs conhecidos" abaixo.
+- `tools/conhecimento.py`: `conhecimento.buscar` (READ_ONLY), resultado já formatado
+  `[arquivo § seção]: texto`.
+- `core/configuracao.py`: `conhecimento.diretorios` — lista de diretórios autorizados a indexar
+  (vazia por padrão; RAG é opt-in).
+- `io/cli.py`: `jarvis indexar <diretorio>` (valida contra `conhecimento.diretorios` com
+  `resolver_dentro_do_jail`, reaproveitado do M2); `_seguro()` — escapa conteúdo do
+  LLM/ferramentas/auditoria antes de `console.print()` (ver bug abaixo).
+- `tests/golden/*.yaml` + `tests/test_golden.py`: primeira implementação real da infraestrutura
+  de golden tasks descrita desde o início do projeto (objetivo → roteiro `FakeProvider` → trace de
+  ações esperado, comparado por igualdade → trechos exigidos na resposta final). 2 casos:
+  `citacao_conhecimento` (RAG com citação) e `resposta_direta_sem_ferramenta` (sem tool-calling).
+- Testado na máquina real com um diretório de documentos fictício (`notas_projeto.md` com
+  cabeçalhos): `jarvis indexar` seguido de uma pergunta em linguagem natural respondida
+  corretamente COM citação `[notas_projeto.md § Como rodar localmente]` renderizada de verdade no
+  terminal — dois bugs reais foram encontrados e corrigidos nesse processo (ver Bugs conhecidos).
+- 121 testes no total (10 novos: chunking md/txt/pdf — PDF de teste escrito à mão, sem depender de
+  lib de geração —, freshness por mtime, ingestão de diretório, 2 golden tasks, regressão do bug
+  de escape de markup).
+
 ## Bugs conhecidos
 
-- Nenhum bug aberto. Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
+- Nenhum bug aberto. Três bugs reais foram encontrados e corrigidos validando o M5 na máquina
+  real (nenhum apareceu nos testes automatizados até então — ver DECISOES.md para os três):
+  (1) coluna `secao` do FTS5 estava `UNINDEXED`, então palavras que só apareciam no título de uma
+  seção markdown eram invisíveis à busca; (2) consultas FTS5 usavam AND implícito entre termos,
+  então perguntas naturais de 4+ palavras raramente batiam num único trecho pequeno — trocado
+  para OR (aplicado também retroativamente a `memory.search`, mesmo defeito desde o M2); (3) o
+  resultado de ferramentas virava `repr()` de lista Python na mensagem pro LLM, e o terminal
+  (Rich) engolia citações `[arquivo § seção]` por interpretá-las como marcação de estilo — ambos
+  corrigidos (`core/loop.py::_formatar_valor_para_llm`, `io/cli.py::_seguro`).
+- Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
   de saída da lista" levava a um device ALSA cru (`hw:0,7`, HDMI) travado em 44100Hz, que rejeitava
   a taxa de 16000Hz usada por padrão. Corrigido usando o dispositivo `default` do PortAudio (que já
   roteia pelo PipeWire/Pulse e resample automaticamente) — ver DECISOES.md.
@@ -183,8 +217,7 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-Seguir para M5 — Conhecimento local (RAG leve): ingestão de `.md`/`.txt`/`.pdf` de diretórios
-autorizados, chunking por cabeçalhos, FTS5 (provavelmente reaproveitando `memory/armazenamento.py`
-ou uma tabela irmã), citação `[arquivo § seção]`, freshness por mtime. DoD: perguntas sobre
-`~/Documentos` respondidas com citação correta nas golden tasks (`tests/golden/*.yaml`, ainda não
-existentes — este marco também introduz o primeiro golden task real do projeto).
+Seguir para M6 — Embeddings opcionais: avaliar embedding local + rerank; adotar SÓ com ganho
+comprovado sobre FTS5 nas golden tasks de recuperação. DoD: benchmark registrado em DECISOES.md
+(pode concluir "não adotar agora" como resultado válido — o marco pede avaliação, não adoção
+obrigatória).

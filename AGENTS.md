@@ -70,8 +70,8 @@ ruff + mypy --strict + pytest.
 
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
-M5 RAG leve local · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz (em
-andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
+M5 RAG leve local (concluído) · M6 Embeddings (só se benchmark provar ganho) · M7 Visão · M8 Voz
+(em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -131,3 +131,20 @@ Checkpoint em SQLite (`core/objetivos.py::RepositorioObjetivos`) a cada subtaref
 nem re-executar o que já passou (retomada pós-crash). `jarvis run "<objetivo>"` no CLI. Validado
 com testes determinísticos (`FakeProvider`) cobrindo replanning e retomada pós-crash, e na máquina
 real com um objetivo de 3 subtarefas usando `memory.store`/`memory.search`.
+
+## M5 — Conhecimento local / RAG leve (concluído)
+
+`memory/conhecimento.py::RepositorioConhecimento` — ingestão de `.md` (chunking por cabeçalho),
+`.txt` (arquivo inteiro), `.pdf` (por página, `pypdf`), FTS5, freshness por mtime, citação
+`[arquivo § seção]`. `conhecimento.buscar` (tool) + `jarvis indexar <diretorio>` (só diretórios
+listados em `conhecimento.diretorios`, validado com o mesmo `resolver_dentro_do_jail` do M2).
+Primeira implementação real de golden tasks (`tests/golden/*.yaml` + `tests/test_golden.py`),
+prevista desde o master prompt original mas nunca antes exercida.
+
+**Três bugs reais** encontrados validando isto na máquina (nenhum apareceu nos testes automatizados
+até então — detalhes e correções em `docs/DECISOES.md`): título de seção fora do índice FTS5,
+consultas FTS5 com AND implícito matando buscas em linguagem natural (corrigido com OR, também
+retroaplicado a `memory.search` do M2), e citações `[arquivo § seção]` sendo engolidas pelo Rich
+por interpretar colchetes como marcação de estilo (`io/cli.py::_seguro()` agora escapa todo
+conteúdo de LLM/ferramentas/auditoria antes de imprimir). Regra prática herdada disto: todo
+`console.print()` novo que interpola conteúdo não escrito por nós precisa passar por `_seguro()`.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from jarvis.core.configuracao import Configuracao, carregar_configuracao
@@ -20,15 +21,27 @@ from jarvis.io.audio import (
     listar_dispositivos,
     tocar,
 )
+from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.observability.auditoria import RegistradorAuditoria
 from jarvis.providers import ErroProvider, LLMProvider, criar_provider_llm
 from jarvis.security.executor import Acao, Executor
+from jarvis.security.jail import ErroForaDoJail, resolver_dentro_do_jail
 from jarvis.tools import RegistroFerramentas, criar_registro_ferramentas_padrao
 from jarvis.tools.base import Ferramenta
 
 console = Console()
 
 COMANDOS_DE_SAIDA = {"sair", "exit", "quit"}
+
+
+def _seguro(valor: object) -> str:
+    """Escapa `[...]` de conteúdo vindo do LLM/ferramentas antes de imprimir com Rich.
+
+    O Rich interpreta `[algo]` em `console.print()` como marcação de estilo por padrão — uma
+    citação `[arquivo § seção]` vinda do LLM (M5) era silenciosamente engolida sem isto, porque
+    "arquivo § seção" não é um estilo Rich válido. Achado na prática, não é hipotético.
+    """
+    return escape(str(valor))
 
 PROMPT_SISTEMA_COM_FERRAMENTAS = (
     "Você é o JARVIS, o agente pessoal autônomo do usuário, rodando localmente no Linux dele.\n"
@@ -76,6 +89,12 @@ def _construir_analisador() -> argparse.ArgumentParser:
     comando_run.add_argument("objetivo", type=str)
     comando_run.set_defaults(funcao=_comando_run)
 
+    comando_indexar = subcomandos.add_parser(
+        "indexar", help="indexa .md/.txt/.pdf de um diretório autorizado em conhecimento.diretorios"
+    )
+    comando_indexar.add_argument("diretorio", type=str)
+    comando_indexar.set_defaults(funcao=_comando_indexar)
+
     return analisador
 
 
@@ -86,7 +105,7 @@ def _montar_prompt_sistema(registro: RegistroFerramentas) -> str:
 def _solicitar_aprovacao_interativa(acao: Acao, ferramenta: Ferramenta) -> bool:
     console.print(
         f"[bold yellow]aprovação necessária[/bold yellow] — {acao.ferramenta} "
-        f"(risco {ferramenta.risco.name}) com argumentos {acao.argumentos}"
+        f"(risco {ferramenta.risco.name}) com argumentos {_seguro(acao.argumentos)}"
     )
     try:
         resposta = console.input("[bold yellow]permitir? (s/N)[/bold yellow] ").strip().lower()
@@ -148,13 +167,15 @@ def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) 
             else:
                 turno = processar_turno(provider, executor, texto_usuario)
                 for acao in turno.acoes_executadas:
-                    console.print(f"[dim]→ executou {acao.ferramenta}({acao.argumentos})[/dim]")
+                    console.print(
+                        f"[dim]→ executou {acao.ferramenta}({_seguro(acao.argumentos)})[/dim]"
+                    )
                 resposta_final = turno.resposta_final
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
             continue
 
-        console.print(f"[bold magenta]jarvis>[/bold magenta] {resposta_final}\n")
+        console.print(f"[bold magenta]jarvis>[/bold magenta] {_seguro(resposta_final)}\n")
 
 
 def _comando_voz_check(argumentos: argparse.Namespace) -> None:
@@ -196,7 +217,7 @@ def _comando_run(argumentos: argparse.Namespace) -> None:
     repositorio = RepositorioObjetivos(configuracao.caminhos.banco_dados)
 
     def _mostrar_progresso(mensagem: str) -> None:
-        console.print(f"[dim]→ {mensagem}[/dim]")
+        console.print(f"[dim]→ {_seguro(mensagem)}[/dim]")
 
     try:
         resultado = executar_objetivo(
@@ -215,6 +236,31 @@ def _comando_run(argumentos: argparse.Namespace) -> None:
         console.print(
             "[bold red]objetivo não concluído[/bold red] — replanejamentos esgotados"
         )
+
+
+def _comando_indexar(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+
+    if not configuracao.conhecimento.diretorios:
+        console.print(
+            "[bold red]erro:[/bold red] nenhum diretório autorizado em "
+            "'conhecimento.diretorios' no config.yaml"
+        )
+        return
+
+    try:
+        caminho = resolver_dentro_do_jail(
+            argumentos.diretorio, list(configuracao.conhecimento.diretorios)
+        )
+    except ErroForaDoJail as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+
+    repositorio = RepositorioConhecimento(configuracao.caminhos.banco_dados)
+    quantidade = repositorio.ingerir_diretorio(caminho)
+    console.print(
+        f"[bold green]{quantidade} trecho(s) indexado(s)[/bold green] a partir de {caminho}"
+    )
 
 
 def _comando_audit(argumentos: argparse.Namespace) -> None:
@@ -254,8 +300,8 @@ def _comando_why(argumentos: argparse.Namespace) -> None:
 
     registro = registros[argumentos.indice - 1]
     console.print(f"[bold]#{argumentos.indice}[/bold] {registro.acao} em {registro.quando}")
-    console.print(f"argumentos: {registro.argumentos_seguros}")
-    console.print(f"resultado: {registro.resultado}")
+    console.print(f"argumentos: {_seguro(registro.argumentos_seguros)}")
+    console.print(f"resultado: {_seguro(registro.resultado)}")
     console.print(f"duração: {registro.duracao_segundos:.3f}s")
     console.print(f"custo estimado: US${registro.custo_estimado_usd:.4f}")
 

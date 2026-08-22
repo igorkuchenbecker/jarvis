@@ -11,11 +11,27 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 from jarvis.providers.base import LLMProvider
 from jarvis.security.executor import Acao, Executor
 
 MAX_ITERACOES_PADRAO = 12
+
+
+def _formatar_valor_para_llm(valor: Any) -> str:
+    """Formata o retorno de uma ferramenta de forma legível para o LLM reutilizar literalmente.
+
+    Uma lista de strings vira uma lista com marcadores em vez do `repr()` de uma lista Python —
+    isso importa de verdade para ferramentas como `conhecimento.buscar`, cujo resultado já vem
+    pronto para ser citado (`[arquivo § seção]: texto`); dentro do repr de uma lista, as aspas e
+    escapes do Python atrapalhavam o modelo a extrair a citação exata (visto na prática, M5).
+    """
+    if isinstance(valor, list):
+        if not valor:
+            return "(nenhum resultado)"
+        return "\n".join(f"- {item}" for item in valor)
+    return repr(valor)
 
 
 @dataclass(frozen=True)
@@ -67,7 +83,7 @@ def processar_turno(
 
         if resultado.sucesso:
             mensagem_resultado = (
-                f"Resultado de {acao.ferramenta}: {resultado.valor!r}. "
+                f"Resultado de {acao.ferramenta}:\n{_formatar_valor_para_llm(resultado.valor)}\n"
                 "Se precisar de outra ferramenta, responda com outro JSON de ação; "
                 "senão, responda ao usuário em texto normal."
             )

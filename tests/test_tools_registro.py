@@ -75,4 +75,5 @@ def test_criar_registro_ferramentas_padrao_inclui_fs_e_memoria(tmp_path: Path) -
         "proc.list",
         "proc.kill",
         "terminal.exec",
+        "conhecimento.buscar",
     } <= nomes

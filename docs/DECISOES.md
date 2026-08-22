@@ -278,6 +278,61 @@ concorrentes, o que não está no roadmap do M4 | Testado com um cenário de "cr
 (reabrir o repositório com uma nova conexão e um `FakeProvider` sem histórico) que retoma
 exatamente na subtarefa certa, sem replanejar nem re-executar a subtarefa já concluída.
 
+---
+
+## M5 — Conhecimento local (RAG leve)
+
+**2026-08-22** | `.md` é dividido em trechos por cabeçalho (`#`..`######`), `.txt` vira um trecho
+único, `.pdf` vira um trecho por página (via `pypdf`) — sem chunking por tamanho fixo/overlap |
+"Chunking por cabeçalhos" é o que o roadmap pede explicitamente; para `.txt` sem estrutura e
+`.pdf` sem cabeçalhos reconhecíveis de forma confiável, a unidade natural é o arquivo inteiro ou a
+página, respectivamente | Chunking por tamanho fixo com overlap (comum em RAG) — rejeitada por
+agora: mais complexa, e nenhum documento de teste (nem uso real esperado no curto prazo) é grande o
+suficiente para essa limitação importar. Revisitar se documentos grandes sem cabeçalhos aparecerem.
+
+**2026-08-22 (bug real, achado validando o DoD na máquina)** | `secao` virou coluna indexada do
+FTS5 (antes era `UNINDEXED`) | Uma pergunta como "como rodar localmente" não encontrava nada: a
+palavra "localmente" só aparecia no título da seção (`## Como rodar localmente`), armazenado em
+`secao`, que estava fora do índice — o corpo do trecho não continha aquela palavra. Descoberto
+testando de verdade na máquina, não em teste unitário (os testes usavam consultas de uma palavra
+só, que não expunham o problema) | Concatenar o título dentro do `texto` indexado — rejeitada por
+duplicar dado sem necessidade quando FTS5 já suporta múltiplas colunas indexadas nativamente |
+Lição registrada: testes unitários com consultas triviais não bastam para validar busca textual;
+o teste manual na máquina real pegou isso.
+
+**2026-08-22 (bug real, mesmo motivo)** | Consultas FTS5 agora são construídas com `OR` entre os
+termos (`jarvis.memory._fts5.construir_consulta_fts5`), não mais o `AND` implícito do FTS5 puro —
+aplicado tanto em `conhecimento.buscar` (M5) quanto retroativamente em `memory.search` (M2, mesmo
+defeito) | Uma pergunta em linguagem natural com 4+ palavras ("como rodar o projeto escolinhas
+localmente") raramente tem TODAS as palavras no mesmo trecho pequeno — cada palavra tende a cair
+num trecho diferente ("projeto"/"escolinhas" no título, "rodar"/"localmente" no corpo de outro
+trecho). Com AND implícito, a busca não retornava nada; `rank` (bm25) do FTS5 já prioriza
+naturalmente os trechos que batem mais termos, então OR é estritamente melhor para este caso de
+uso | Deixar o AND implícito e instruir o LLM a mandar consultas de 1-2 palavras — rejeitada por
+empurrar para o prompt um problema que é do mecanismo de busca, contrariando o espírito de
+"validação em código, não em prompt" | Extraído para `memory/_fts5.py` (usado por
+`armazenamento.py` e `conhecimento.py`) — também reduz superfície de injeção de sintaxe FTS5
+(aspas, `NEAR`, etc.) vinda de texto arbitrário, já que só `\w+` sobrevive à extração de termos.
+
+**2026-08-22 (bug real, mesmo motivo — mas fora do RAG)** | `core/loop.py::_formatar_valor_para_llm`
+formata resultado de ferramenta como lista com marcadores (`- item`) em vez de `repr()` de uma
+lista Python, e `io/cli.py` agora escapa (`rich.markup.escape`) todo conteúdo vindo do
+LLM/ferramentas antes de `console.print()` | Achados AMBOS testando o DoD do M5 na máquina real:
+(1) o resultado de `conhecimento.buscar` (uma lista de strings já formatadas
+`"[arquivo § seção]: texto"`) virava `repr()` dentro da mensagem enviada de volta ao LLM — aspas e
+escapes do Python atrapalhavam o modelo a extrair a citação exata; (2) mesmo com o modelo citando
+certo, a citação `[arquivo § seção]` sumia da tela porque `Console.print()` do Rich interpreta
+`[algo]` como marcação de estilo por padrão — "arquivo § seção" não é um estilo válido, então o
+Rich descartava o trecho silenciosamente (sem erro visível). Nenhum dos dois apareceria em teste
+automatizado com `FakeProvider`+`capsys`, porque os testes nunca imprimem via `Console` real com
+markup ativo nem verificam a exatidão de uma citação impressa — só testes manuais na máquina
+pegaram isso | N/A — são bugs, não decisões de design; registrados aqui porque a causa raiz
+(Rich interpretando conteúdo de terceiros como markup) é uma classe de bug que pode voltar em
+qualquer novo `console.print()` futuro que interpole texto do LLM/ferramentas/auditoria sem
+`_seguro()`/`escape()` | Regra prática daqui pra frente: todo `console.print()` que interpola
+conteúdo que não foi escrito por nós mesmos (resposta do LLM, argumentos de ação, resultado de
+ferramenta, campos de auditoria) precisa passar por `_seguro()` em `io/cli.py`.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar
