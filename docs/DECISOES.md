@@ -72,6 +72,65 @@ com `voz.dispositivo: auto` agora significa "não fixar nenhum índice, deixar o
 não "primeiro da lista". `dispositivo_padrao_do_sistema()` existe só para exibição amigável do
 nome do dispositivo ao usuário; a escolha real de rota de áudio é sempre feita pelo PortAudio.
 
+---
+
+## M1 — Core conversacional
+
+**2026-08-22** | M1 foi construído fora de ordem, a pedido direto do usuário no meio da missão
+M8 ("quero testar o jarvis em si, não só a parte de microfone") | Sem M1 não existe "jarvis" para
+testar de verdade — só fundação (M0) e E/S de áudio isolada (M8/V0) | Terminar M8 primeiro e só
+depois voltar a M1 — rejeitada porque o usuário pediu explicitamente para testar o agente
+conversando, e isso não é possível sem M1 | M1 implementado como fatia autocontida (providers,
+configuração, loop de conversa no CLI), sem tocar no que falta de M2-M7. Voltar ao roadmap M8
+V1-V4 depois desta fatia, a menos que o usuário redirecione de novo.
+
+**2026-08-22** | `ClaudeCliProvider` chama `claude -p --output-format json --tools= --system-prompt
+"<persona mínima>"`, com `--session-id`/`--resume` para manter a conversa | Testado na máquina
+real: sem restringir nada, cada chamada custou ~US$0,035-0,05 e recarregava ~8-11 mil tokens de
+contexto padrão do Claude Code (CLAUDE.md, definição de ferramentas etc.), mesmo para "qual é a
+capital do Brasil?". Com `--system-prompt` próprio (substituindo o padrão) o custo caiu para
+~US$0,012 na primeira chamada; com `--resume` na mesma sessão, a segunda chamada custou ~US$0,001
+(cache do lado do Anthropic). `--tools=` desliga as ferramentas nativas do Claude Code — sem isso,
+o provider poderia executar ações no sistema por conta própria, violando o invariante "o modelo
+nunca executa nada" (quem decide/executa é o executor do JARVIS, a partir do M2) | (a) usar o
+system prompt padrão do Claude Code — rejeitada pelo custo e por trazer identidade/instruções que
+não são as do JARVIS; (b) `--bare` para cortar ainda mais overhead — rejeitada porque exige
+`ANTHROPIC_API_KEY` (nunca lê OAuth/keychain), contrariando a decisão de usar a assinatura
+existente sem chave paga | Todo uso do `ClaudeCliProvider` em produção paga por token via a
+assinatura do usuário; manter `--system-prompt` enxuto e `--resume` sempre que possível é o que
+mantém isso barato. Testes usam um binário `claude` falso, nunca o real.
+
+**2026-08-22** | Interface `LLMProvider` é `enviar(mensagem: str) -> str` (stateful, uma mensagem
+por vez) em vez de `enviar(historico: list[Mensagem]) -> str` (stateless, histórico completo a
+cada chamada) | O `ClaudeCliProvider` já ganha continuidade de graça via `--resume` da própria CLI
+(sessão do lado do Claude Code); reenviar o histórico inteiro a cada turno jogaria fora esse cache
+e faria o custo crescer com o tamanho da conversa. Cada provider passa a ser responsável por
+guardar seu próprio estado de sessão | Interface stateless com histórico completo — rejeitada por
+ser mais cara no caso real (`ClaudeCliProvider`) sem ganho de simplicidade correspondente (o loop
+do CLI já não precisa gerenciar uma lista de mensagens, só chamar `enviar()` e imprimir) | Quando
+`AnthropicProvider`/`OpenAICompatProvider` chegarem, cada um decide internamente como manter seu
+próprio histórico (provavelmente guardando a lista de mensagens dentro da instância). `reiniciar()`
+existe na interface para descartar a sessão/histórico corrente sem recriar o provider.
+
+**2026-08-22** | M1 usa `--output-format json` (não-streaming), apesar do master prompt sugerir
+`stream-json` | Streaming exigiria parsear eventos parciais e não é necessário para o DoD do M1
+("conversa real funcionando no terminal") — uma resposta completa impressa de uma vez já cumpre
+isso, com pipeline bem mais simples de implementar e testar | Implementar streaming já no M1 —
+rejeitada por adicionar complexidade (parsing incremental, testes de streaming) sem que o DoD
+exija | Streaming fica como melhoria futura, não registrada como pendência obrigatória de nenhum
+marco específico; revisitar apenas se a latência de resposta completa incomodar no uso real.
+
+**2026-08-22** | `carregar_configuracao()` tem padrões embutidos no código (dataclasses com
+`default`) e só sobrescreve com o que estiver em `~/jarvis/config.yaml`, que continua opcional |
+`config.yaml` nunca é versionado (está no `.gitignore` desde o M0); o `jarvis` precisa funcionar
+"out of the box" sem o usuário copiar `config.yaml.example` manualmente primeiro | Exigir que
+`config.yaml` exista (erro se ausente) — rejeitada por atrito desnecessário para uso local pessoal;
+ler `config.yaml.example` como config real em runtime — rejeitada por misturar "arquivo de
+documentação/template" com "arquivo de configuração efetiva" | Só as chaves de `provedor.llm_padrao`
+e `provedor.claude_cli.*` são lidas por enquanto — as demais seções de `config.yaml.example`
+(autonomia, limites, segurança, voz) ainda não têm código que as leia; ler quando o marco
+correspondente (M2/M3/M8-V1+) precisar delas.
+
 **2026-08-22** | Dependências de voz (`sounddevice`, `numpy`, `faster-whisper`) isoladas no extra
 opcional `voz` do `pyproject.toml`, não nas dependências base do projeto | `config.yaml.example`
 já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria precisar baixar

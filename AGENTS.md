@@ -68,10 +68,10 @@ ruff + mypy --strict + pytest.
 
 ## Roadmap (resumo)
 
-M0 Fundação (concluído) · M1 Core conversacional · M2 Tool calling · M3 Sistema + segurança
-plena · M4 Loop autônomo + goals · M5 RAG leve local · M6 Embeddings (só se benchmark provar
-ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use
-controlado · M10 Integração 1.0.
+M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling ·
+M3 Sistema + segurança plena · M4 Loop autônomo + goals · M5 RAG leve local · M6 Embeddings (só
+se benchmark provar ganho) · M7 Visão · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9
+Computer use controlado · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -89,3 +89,11 @@ contínua, barge-in, hotkey global do Hyprland, streaming de tokens falados, dia
 multi-idioma além do pt-BR.
 
 Estado detalhado de qual fatia (V0/V1/V2/V3/V4) está feita: `docs/PROJECT_STATE.md`.
+
+## M1 — Core conversacional (concluído fora de ordem)
+
+Também solicitado diretamente, no meio da missão M8 ("quero testar o jarvis em si"). `jarvis` sem
+subcomando agora é uma conversa real de texto com o `ClaudeCliProvider` (via `claude -p`, sem
+tools próprias, com `--system-prompt` mínimo e `--resume` para manter a sessão barata — decisões
+e números de custo reais em `docs/DECISOES.md`). Ainda sem tool-calling (isso é M2): é conversa
+pura, sem o agente agir sobre o sistema.

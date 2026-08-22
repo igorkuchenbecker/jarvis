@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0 concluído; M8/V0 — Fundação de áudio em andamento)
+**Versão:** 0.1.0 (M0 concluído; M1 concluído fora de ordem; M8/V0 — Fundação de áudio)
 **Última atualização:** 2026-08-22
 
 ## Feito
@@ -35,12 +35,32 @@
   corrigido nesta fatia (ver Bugs conhecidos/DECISOES.md).
 - 17 testes (auditoria, logs, áudio, CLI) — todos com Fakes/monkeypatch, sem tocar hardware real.
 
+### M1 — Core conversacional (fora de ordem, a pedido do usuário)
+- `core/configuracao.py`: `carregar_configuracao()` lê `~/jarvis/config.yaml` (opcional) com
+  padrões embutidos; hoje só entende `provedor.llm_padrao` e `provedor.claude_cli.*`.
+- `providers/base.py`: `LLMProvider` (Protocol: `enviar(mensagem) -> str`, `reiniciar()`) e
+  `ErroProvider`.
+- `providers/claude_cli.py`: `ClaudeCliProvider` real — chama `claude -p --output-format json
+  --tools= --system-prompt "<persona jarvis>"`, usando `--session-id` na primeira mensagem e
+  `--resume` nas seguintes (histórico fica do lado da CLI do claude, barato via cache). Erros
+  amigáveis para binário ausente, timeout, exit code != 0, saída não-JSON e `is_error`.
+- `providers/fake.py`: `FakeProvider` roteirizado, só para testes.
+- `io/cli.py`: `jarvis` (sem subcomando) agora inicia um loop de conversa real no terminal
+  (`você>` / `jarvis>`), com `sair`/`exit`/`quit` para encerrar e `reiniciar` para zerar a sessão.
+- Testado na máquina real com a CLI `claude` de verdade: pergunta "qual é a capital do brasil?"
+  respondida corretamente ("Brasília."), `reiniciar` confirmado. Custo por chamada caiu de
+  ~US$0,035-0,05 (sem restringir nada) para ~US$0,012 na primeira mensagem e ~US$0,001 nas
+  seguintes da mesma sessão (`--system-prompt` enxuto + `--resume`) — ver DECISOES.md.
+- 38 testes no total (21 novos: configuração, `FakeProvider`, `ClaudeCliProvider` com um binário
+  `claude` falso gerado nos testes, loop de conversa do CLI) — nenhum toca rede, CLI real ou custa
+  dinheiro.
+
 ## Bugs conhecidos
 
-- Nenhum bug aberto. Um bug foi encontrado e corrigido nesta sessão: escolher "o primeiro
-  dispositivo de saída da lista" levava a um device ALSA cru (`hw:0,7`, HDMI) travado em 44100Hz,
-  que rejeitava a taxa de 16000Hz usada por padrão. Corrigido usando o dispositivo `default` do
-  PortAudio (que já roteia pelo PipeWire/Pulse e resample automaticamente) — ver DECISOES.md.
+- Nenhum bug aberto. Um bug foi encontrado e corrigido no M8/V0: escolher "o primeiro dispositivo
+  de saída da lista" levava a um device ALSA cru (`hw:0,7`, HDMI) travado em 44100Hz, que rejeitava
+  a taxa de 16000Hz usada por padrão. Corrigido usando o dispositivo `default` do PortAudio (que já
+  roteia pelo PipeWire/Pulse e resample automaticamente) — ver DECISOES.md.
 
 ## Limitação de verificação conhecida
 
@@ -50,25 +70,27 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Dívida técnica
 
-- Nenhum provider de LLM (`ClaudeCliProvider`, `FakeProvider` etc.), nenhum core loop, nenhuma
-  ferramenta (`fs.*`, `memory.*`) nem executor de ações — M1/M2/M3 não foram construídos ainda.
-  Isso é relevante para o M8: a fatia V3 (conversa por voz ponta-a-ponta) foi projetada para
-  depender do "mesmo core loop do chat textual" e de "ferramentas já existentes", que não existem.
-  Decisão registrada em DECISOES.md: V3 terá escopo reduzido (voz → LLMProvider direto, sem
-  tool-calling) até M1/M2 existirem.
-- `config.yaml.example` ainda não é lido por código nenhum (nem a seção `voz` nem o resto);
-  carregamento de config chega quando algum módulo precisar dele.
+- Ainda não existe core loop de agente (percepção→plano→ação→observação, M4), nem ferramentas
+  (`fs.*`, `memory.*`) nem executor de ações (M2/M3) — a conversa do M1 é só ida-e-volta de texto
+  com o LLM, sem tool-calling. Isso é relevante para o M8: a fatia V3 (conversa por voz
+  ponta-a-ponta) foi projetada para depender do "mesmo core loop do chat textual" e de "ferramentas
+  já existentes"; agora existe uma conversa textual real para religar, mas ainda sem ferramentas —
+  decisão em DECISOES.md permanece: V3 usa `LLMProvider` direto, sem tool-calling, até M2 existir.
+- `config.yaml.example` só é lido parcialmente: `provedor.llm_padrao`/`provedor.claude_cli.*` já
+  são usados por `carregar_configuracao()`; `autonomia`, `limites`, `seguranca`, `caminhos` e `voz`
+  ainda não têm código que os leia.
 - `jarvis.db` (SQLite) ainda não existe.
-- STT (`WhisperSTTProvider`), TTS (`PiperTTSProvider`) e o modo `jarvis voz` (V1-V4) ainda não
-  foram implementados — ficam para as próximas sessões deste marco.
+- `AnthropicProvider`/`OpenAICompatProvider` não implementados; `criar_provider_llm()` só aceita
+  `llm_padrao: claude_cli` por enquanto (qualquer outro valor levanta `ErroProvider`).
+- Streaming (`stream-json`) não implementado — `ClaudeCliProvider` usa `--output-format json`
+  síncrono (decisão registrada, não é dívida bloqueante, só uma melhoria futura possível).
+- STT (`WhisperSTTProvider`), TTS (`PiperTTSProvider`) e o modo `jarvis voz` (M8/V1-V4) ainda não
+  foram implementados.
 
 ## Próximo passo
 
-Continuar o marco M8 pela fatia V1 — STT: `STTProvider`/`WhisperSTTProvider` (faster-whisper,
-device CUDA se livre com fallback automático para CPU, download do modelo só na primeira execução
-real com aviso no console), `FakeSTTProvider` para os testes, fixtures WAV geradas por script (não
-commitar binário). DoD: ditado real aparece correto no terminal.
-
-Depois: V2 (TTS/Piper), V3 (conversa por voz ponta-a-ponta, com o escopo reduzido já registrado em
-DECISOES.md), V4 (robustez/métricas). Quando M1/M2 forem retomados como marco corrente, revisitar
-V3 para religar o modo voz ao core loop completo com tool-calling.
+A definir com o usuário: retomar M8 pela fatia V1 (STT/faster-whisper) como planejado antes da
+pausa para M1, ou seguir para M2 (tool calling) agora que a conversa real está funcionando e faz
+mais sentido religar ferramentas a ela. Nenhuma decisão tomada ainda — esperar sinal do usuário na
+próxima sessão em vez de escolher sozinho, já que as duas direções têm o mesmo peso no roadmap
+original e a escolha é mais sobre prioridade de produto do que sobre arquitetura.

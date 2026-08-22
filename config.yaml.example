@@ -8,7 +8,6 @@ provedor:
   claude_cli:
     binario: claude
     timeout_segundos: 120
-    formato_saida: stream-json
   anthropic:
     modelo: claude-sonnet-5
     max_tokens: 8192

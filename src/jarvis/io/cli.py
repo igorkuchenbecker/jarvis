@@ -6,6 +6,7 @@ import argparse
 
 from rich.console import Console
 
+from jarvis.core.configuracao import carregar_configuracao
 from jarvis.io.audio import (
     AudioIndisponivel,
     dispositivo_entrada_padrao,
@@ -15,8 +16,11 @@ from jarvis.io.audio import (
     listar_dispositivos,
     tocar,
 )
+from jarvis.providers import ErroProvider, LLMProvider, criar_provider_llm
 
 console = Console()
+
+COMANDOS_DE_SAIDA = {"sair", "exit", "quit"}
 
 
 def principal() -> None:
@@ -41,9 +45,44 @@ def _construir_analisador() -> argparse.ArgumentParser:
 
 
 def _comando_padrao(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+    try:
+        provider = criar_provider_llm(configuracao)
+    except ErroProvider as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+    _executar_conversa(provider)
+
+
+def _executar_conversa(provider: LLMProvider) -> None:
     console.print(
-        "[bold cyan]JARVIS[/bold cyan] — fundação instalada. Marco M1 trará a conversa real."
+        "[bold cyan]JARVIS[/bold cyan] — modo conversa. "
+        "Digite 'sair' (ou Ctrl+C/Ctrl+D) para encerrar, 'reiniciar' para começar do zero.\n"
     )
+
+    while True:
+        try:
+            texto_usuario = console.input("[bold green]você>[/bold green] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+
+        if not texto_usuario:
+            continue
+        if texto_usuario in COMANDOS_DE_SAIDA:
+            break
+        if texto_usuario == "reiniciar":
+            provider.reiniciar()
+            console.print("[dim]sessão reiniciada.[/dim]\n")
+            continue
+
+        try:
+            resposta = provider.enviar(texto_usuario)
+        except ErroProvider as erro:
+            console.print(f"[bold red]erro:[/bold red] {erro}\n")
+            continue
+
+        console.print(f"[bold magenta]jarvis>[/bold magenta] {resposta}\n")
 
 
 def _comando_voz_check(argumentos: argparse.Namespace) -> None:
