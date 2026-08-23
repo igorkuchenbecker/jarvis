@@ -300,6 +300,23 @@
   monkeypatchado (HTTPError/URLError/timeout/não-JSON). Zero rede nos testes.
 - Suíte completa: 211 testes verdes (`scripts/check.sh`).
 
+### Base de conhecimento — dois livros indexados (pós-roadmap, uso do M5 existente)
+- Não é código novo: o usuário colocou dois PDFs em `~/second-brain/01-knowledge/` (*Código
+  Limpo*, Robert C. Martin, PT-BR, 398 páginas; *Fundamentos Matemáticos para a Ciência da
+  Computação*, Judith Gersting, PT-BR, 749 páginas) e pediu para o conteúdo virar conhecimento
+  usável tanto no second brain quanto pelo JARVIS.
+- `config.yaml` (não versionado) já tinha `conhecimento.diretorios: [~/second-brain]` — nenhuma
+  mudança de configuração foi necessária, só rodar `jarvis indexar ~/second-brain` de novo para
+  o M5 (ver seção M5 acima) reindexar os dois PDFs recém-colocados junto com o resto da base.
+- Resultado real: 866 trechos indexados no total. Validado na máquina real com
+  `RepositorioConhecimento.buscar()` direto: consultas em português retornam tanto as 16 notas
+  sintetizadas novas em `second-brain/01-knowledge/{engenharia-software,matematica-discreta}/`
+  quanto trechos crus dos próprios PDFs por número de página real (ex.: consulta por "Teorema de
+  Bayes" retorna a página 239 do PDF do Gersting), confirmando que o pipeline `.pdf` por página
+  do M5 processou os dois livros de ponta a ponta, não só os `.md`.
+- Sem mudança de versão — é dado novo na base de conhecimento indexada pelo M5, não uma
+  funcionalidade nova do agente.
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com
