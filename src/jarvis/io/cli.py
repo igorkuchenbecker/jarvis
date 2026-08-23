@@ -181,18 +181,21 @@ def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) 
             continue
 
         try:
-            if executor is None:
-                resposta_final = provider.enviar(texto_usuario)
-            else:
-                turno = processar_turno(provider, executor, texto_usuario)
-                for acao in turno.acoes_executadas:
-                    console.print(
-                        f"[dim]→ executou {acao.ferramenta}({_seguro(acao.argumentos)})[/dim]"
-                    )
-                resposta_final = turno.resposta_final
+            with console.status("[dim]pensando...[/dim]", spinner="dots"):
+                if executor is None:
+                    resposta_final = provider.enviar(texto_usuario)
+                else:
+                    turno = processar_turno(provider, executor, texto_usuario)
+                    resposta_final = turno.resposta_final
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
             continue
+
+        if executor is not None:
+            for acao in turno.acoes_executadas:
+                console.print(
+                    f"[dim]→ executou {acao.ferramenta}({_seguro(acao.argumentos)})[/dim]"
+                )
 
         console.print(f"[bold magenta]jarvis>[/bold magenta] {_seguro(resposta_final)}\n")
 
@@ -245,7 +248,8 @@ def _executar_conversa_voz(
         console.print(f"[bold green]você (voz)>[/bold green] {_seguro(texto_usuario)}")
 
         try:
-            turno = processar_turno(provider, executor, texto_usuario)
+            with console.status("[dim]pensando...[/dim]", spinner="dots"):
+                turno = processar_turno(provider, executor, texto_usuario)
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
             continue

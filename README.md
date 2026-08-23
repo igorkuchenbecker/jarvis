@@ -70,7 +70,7 @@ Configuração opcional em `config.yaml` (modelo em `config.yaml.example`): auto
 jail de caminhos, allowlist, diretórios de conhecimento, voz e computador. Sem arquivo, roda com
 os padrões embutidos (tudo que é arriscado — voz, computer use — vem desligado por padrão).
 
-186 testes, todos offline (`FakeProvider`/mocks, zero rede — os `scripts/validar_*_real.py` são
+190 testes, todos offline (`FakeProvider`/mocks, zero rede — os `scripts/validar_*_real.py` são
 validação manual à parte, fora da suíte, que de fato baixam modelos/tocam hardware). Decisões
 técnicas registradas em `docs/DECISOES.md`; estado atual e dívida técnica em
 `docs/PROJECT_STATE.md`.

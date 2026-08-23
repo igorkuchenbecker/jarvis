@@ -204,3 +204,10 @@ do usuário e chegou a persistir dados pessoais reais numa execução manual (re
 percebido). A API de `criar_ferramentas_visao()` nem aceita mais um repositório de memória, por
 decisão explícita registrada em `docs/DECISOES.md`. Se o usuário quiser lembrar de algo visto na
 tela, o LLM usa `memory.store` normalmente, por pedido explícito — nunca automático.
+
+## Pós-1.0 — Indicador de carregamento (não é um marco novo do roadmap)
+
+`with console.status("[dim]pensando...[/dim]", spinner="dots"):` (Rich, já dependência) envolve
+a chamada bloqueante ao provider/loop em `_executar_conversa`/`_executar_conversa_voz`, já que o
+projeto não faz streaming (decisão do M1). Validado numa sessão real de terminal via `script`
+(pseudo-tty) — ver `docs/DECISOES.md` pelo comando exato e o que o log confirmou. Versão `1.0.1`.

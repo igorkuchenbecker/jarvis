@@ -575,3 +575,47 @@ via config e exercitado através de uma conversa real (o LLM decidiu sozinho cha
 o executor rodou, a resposta citou as janelas reais corretamente), provando que M9 se integra ao
 loop de conversa do M2 de verdade, não só que os módulos isolados passam em teste unitário —
 esse é o tipo de prova que "Integração 1.0" deveria de fato entregar.
+
+---
+
+## Pós-1.0 — Indicador de carregamento ("pensando...")
+
+**2026-08-23** | Indicador visual de carregamento implementado com `Console.status()` do Rich
+(já dependência do projeto), não uma solução própria (thread + `\r` manual, ou uma lib nova de
+spinner) | Rich já expõe exatamente essa funcionalidade (`with console.status(msg, spinner=...)`)
+— reimplementar seria duplicar código que já existe testado, contrariando o princípio geral do
+projeto de não adicionar dependência/complexidade quando algo já disponível resolve (mesmo
+espírito da rejeição de `webrtcvad`/`silero-vad` no M8) | (a) construir um spinner manual com
+thread + escrita direta no stdout — rejeitada por reinventar o que o Rich já faz, e por trazer
+risco de condição de corrida com `console.print()` concorrente; (b) usar `rich.live.Live`
+diretamente — rejeitada por ser mais verboso que `console.status()` pro mesmo efeito | Envolve a
+chamada bloqueante ao provider (`provider.enviar()`/`processar_turno()`) em `_executar_conversa`
+(texto) e `_executar_conversa_voz` (voz) com `with console.status("[dim]pensando...[/dim]",
+spinner="dots"):`. Como o projeto não implementa streaming (decisão já registrada no M1), o
+indicador cobre naturalmente o intervalo inteiro entre envio e resposta completa — não existe
+"primeiro token" pra distinguir.
+
+**2026-08-23** | Verificado que `Console.status()` não escreve NADA quando `console.is_terminal`
+é falso (saída não-interativa, como a capturada por `capsys` nos testes) | Achado ao testar antes
+de escrever os testes: um `Console(file=StringIO(), force_terminal=False)` produz string vazia
+pro bloco `status()`, só a chamada `.print()` posterior aparece | Isso significa que os testes
+não conseguem verificar o indicador lendo a saída capturada (`capsys`) como fazem pra outras
+mensagens — teriam que fazer monkeypatch de `console.status` diretamente pra confirmar a
+chamada/mensagem/ordem relativa. É o que os novos testes fazem (`test_executar_conversa_mostra_
+indicador_de_carregamento_por_mensagem`, `test_executar_conversa_indicador_desaparece_antes_da_
+resposta_aparecer`, `test_executar_conversa_voz_mostra_indicador_de_carregamento`) — sem isso,
+os testes passariam mesmo se o indicador fosse removido por engano, o que derrotaria o propósito.
+
+**2026-08-23** | Validado numa sessão real de terminal (não só com fakes) usando `script -qc
+".venv/bin/jarvis" saida.log` (comando padrão do util-linux pra gravar uma sessão de pseudo-tty
+com todos os bytes/escapes ANSI, sem precisar de nenhuma ferramenta nova) | Rich só anima o
+spinner quando detecta um terminal real (`isatty()`); rodar `jarvis` direto num pipe (como os
+testes automatizados fazem) não prova que a animação aparece de verdade pra um usuário — só o
+pseudo-tty prova isso | Confiar só nos testes com mock de `console.status` — rejeitada pela mesma
+razão de todo marco anterior do projeto: mock prova que o CÓDIGO chama a API certa, não que o
+EFEITO visual realmente acontece num terminal de verdade | Log capturado confirma: `\x1b[?25l`
+(cursor escondido) seguido de múltiplos frames do spinner "dots" (caracteres Braille) alternando
+com o texto "pensando...", `\r\x1b[2K` entre frames (limpa a linha pra redesenhar), e ao final
+`\x1b[?25h\r\x1b[1A\x1b[2K` (mostra cursor de novo, sobe uma linha, limpa) imediatamente ANTES da
+linha final `jarvis> Brasília.` aparecer — prova visual completa de que o indicador aparece,
+anima, e desaparece limpo exatamente no intervalo certo, sem sujar a resposta final.

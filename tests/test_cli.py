@@ -17,6 +17,21 @@ from jarvis.tools import RegistroFerramentas
 from jarvis.tools.fs import criar_ferramentas_fs
 
 
+class _StatusFalso:
+    """Substitui Console.status() nos testes — registra a mensagem sem desenhar nada real."""
+
+    def __init__(self, chamadas: list[str], mensagem: str) -> None:
+        self._chamadas = chamadas
+        self._mensagem = mensagem
+
+    def __enter__(self) -> _StatusFalso:
+        self._chamadas.append(self._mensagem)
+        return self
+
+    def __exit__(self, *excecao: Any) -> None:
+        return None
+
+
 def _entradas(*textos: str) -> Any:
     fila = iter(textos)
 
@@ -76,6 +91,60 @@ def test_executar_conversa_troca_mensagens_ate_o_usuario_sair(
     assert "olá!" in saida
     assert "tudo ótimo, e você?" in saida
     assert provider.historico == ["oi", "tudo bem?"]
+
+
+def test_executar_conversa_mostra_indicador_de_carregamento_por_mensagem(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Indicador de 'pensando' deve envolver cada chamada ao provider/loop — uma vez por
+    mensagem enviada, não uma vez só pra conversa inteira."""
+    chamadas: list[str] = []
+    monkeypatch.setattr(
+        cli.console, "status", lambda mensagem, spinner="dots": _StatusFalso(chamadas, mensagem)
+    )
+    monkeypatch.setattr(cli.console, "input", _entradas("oi", "tudo bem?", "sair"))
+    provider = FakeProvider(["olá!", "tudo ótimo, e você?"])
+
+    cli._executar_conversa(provider)
+
+    assert chamadas == ["[dim]pensando...[/dim]", "[dim]pensando...[/dim]"]
+
+
+def test_executar_conversa_indicador_desaparece_antes_da_resposta_aparecer(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """O 'with' do status precisa fechar (spinner sumir) ANTES do texto final ser impresso —
+    não em paralelo. Provamos isso registrando a ordem relativa de entrada/saída do status
+    versus a impressão da resposta numa lista compartilhada."""
+    eventos: list[str] = []
+
+    class _StatusRegistrado(_StatusFalso):
+        def __exit__(self, *excecao: Any) -> None:
+            eventos.append("status:fechou")
+            return super().__exit__(*excecao)
+
+        def __enter__(self) -> _StatusRegistrado:
+            eventos.append("status:abriu")
+            return self
+
+    monkeypatch.setattr(
+        cli.console, "status", lambda mensagem, spinner="dots": _StatusRegistrado([], mensagem)
+    )
+
+    console_print_original = cli.console.print
+
+    def _print_registrando(*args: Any, **kwargs: Any) -> None:
+        texto = str(args[0]) if args else ""
+        if "jarvis>" in texto:
+            eventos.append("resposta:impressa")
+        console_print_original(*args, **kwargs)
+
+    monkeypatch.setattr(cli.console, "print", _print_registrando)
+    monkeypatch.setattr(cli.console, "input", _entradas("oi", "sair"))
+
+    cli._executar_conversa(FakeProvider(["olá!"]))
+
+    assert eventos == ["status:abriu", "status:fechou", "resposta:impressa"]
 
 
 def test_executar_conversa_encerra_limpo_com_eof(
@@ -316,6 +385,31 @@ def test_executar_conversa_voz_transcreve_processa_e_fala_a_resposta(
     assert tts.historico == ["Brasília é a capital do Brasil."]
     assert len(chamadas_tocar) == 1
     assert chamadas_tocar[0][1] == 22050
+
+
+def test_executar_conversa_voz_mostra_indicador_de_carregamento(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal)
+    monkeypatch.setattr(cli, "tocar", lambda sinal, taxa: None)
+
+    chamadas: list[str] = []
+    monkeypatch.setattr(
+        cli.console, "status", lambda mensagem, spinner="dots": _StatusFalso(chamadas, mensagem)
+    )
+
+    cli._executar_conversa_voz(
+        FakeProvider(["olá!"]),
+        _executor_com_ferramentas_fs(tmp_path),
+        FakeSTTProvider(["oi"]),
+        FakeTTSProvider(),
+        6.0,
+        16000,
+    )
+
+    assert chamadas == ["[dim]pensando...[/dim]"]
 
 
 def test_executar_conversa_voz_executa_ferramenta_de_verdade(

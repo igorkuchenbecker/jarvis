@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.0.0 (M0-M10 concluídos — roadmap completo)
+**Versão:** 1.0.1 (M0-M10 concluídos — roadmap completo; +indicador de carregamento pós-1.0)
 **Última atualização:** 2026-08-23
 
 ## Feito
@@ -260,6 +260,24 @@
     de verdade ao loop de conversa do M2, não só que os módulos individuais funcionam sozinhos.
 - 187 testes (1 novo: `--version`).
 - Roadmap M0-M10 fechado por completo nesta sessão (2026-08-23), a pedido direto do usuário.
+
+### Pós-1.0 — Indicador de carregamento ("pensando...")
+- Tarefa avulsa pedida depois do 1.0 (não é um marco novo do roadmap): mostrar um spinner
+  enquanto o JARVIS processa uma resposta, já que não há streaming (decisão do M1) — o usuário
+  ficava sem feedback nenhum durante chamadas que podem levar vários segundos, inclusive turnos
+  com múltiplas ferramentas encadeadas.
+- `io/cli.py`: `with console.status("[dim]pensando...[/dim]", spinner="dots"):` envolvendo a
+  chamada bloqueante ao provider/loop em `_executar_conversa` (texto) e `_executar_conversa_voz`
+  (voz). Usa `Console.status()` do Rich (já dependência do projeto) — zero dependência nova.
+- 3 testes novos (mock de `console.status` para confirmar chamada, mensagem e ordem relativa
+  abre→fecha→resposta-impressa; `Console.status()` não escreve nada em saída não-terminal, então
+  não dá pra verificar isso por `capsys` como outras mensagens).
+- **Validado numa sessão real de terminal** via `script -qc ".venv/bin/jarvis" saida.log`
+  (pseudo-tty, captura os bytes/escapes ANSI reais): confirma cursor escondido, múltiplos frames
+  do spinner "dots" alternando com "pensando...", e limpeza correta (`cursor-up + clear-line`)
+  exatamente antes da resposta final aparecer — sem sujeira. Comando completo em DECISOES.md.
+- Versão bumped para `1.0.1` (correção/melhoria de UX, não funcionalidade nova de roadmap).
+- 190 testes no total.
 
 ## Bugs conhecidos
 
