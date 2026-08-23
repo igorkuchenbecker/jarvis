@@ -267,3 +267,16 @@ def test_fabrica_le_a_chave_da_variavel_de_ambiente(monkeypatch: pytest.MonkeyPa
 
     assert isinstance(provider, OpenAICompatProvider)
     assert provider._api_key == "sk-teste"
+
+
+def test_postar_json_envia_user_agent_proprio(monkeypatch: pytest.MonkeyPatch) -> None:
+    capturado: dict[str, Any] = {}
+
+    def abrir(requisicao: Any, timeout: float) -> Any:
+        capturado["headers"] = dict(requisicao.header_items())
+        return _urlopen_falso(b"{}")(requisicao, timeout)
+
+    monkeypatch.setattr(ALVO_URLOPEN, abrir)
+    _postar_json("http://servidor", {}, {}, 10)
+
+    assert capturado["headers"]["User-agent"].startswith("jarvis/")

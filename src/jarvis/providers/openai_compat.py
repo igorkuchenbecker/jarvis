@@ -10,6 +10,7 @@ consegue participar do loop de ferramentas sem suporte nativo a tool-calling.
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import urllib.error
 import urllib.request
@@ -21,6 +22,13 @@ from jarvis.providers.claude_cli import PROMPT_SISTEMA_PADRAO
 
 Transporte = Callable[[str, dict[str, Any], dict[str, str], int], dict[str, Any]]
 
+try:
+    VERSAO_JARVIS = importlib.metadata.version("jarvis")
+except importlib.metadata.PackageNotFoundError:
+    VERSAO_JARVIS = "0"
+
+USER_AGENT = f"jarvis/{VERSAO_JARVIS}"
+
 
 def _postar_json(
     url: str, corpo: dict[str, Any], headers: dict[str, str], timeout: int
@@ -28,7 +36,7 @@ def _postar_json(
     requisicao = urllib.request.Request(
         url,
         data=json.dumps(corpo).encode("utf-8"),
-        headers=headers,
+        headers={"User-Agent": USER_AGENT, **headers},
         method="POST",
     )
     try:
