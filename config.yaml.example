@@ -26,6 +26,11 @@ limites:
 seguranca:
   jail_paths:
     - ~/jarvis/workspace
+  # Raizes extras visiveis SO para fs.read/fs.list (leitura). fs.write nunca
+  # enxerga isto -- continua confinado a jail_paths acima. Ex: ["~"] deixa o
+  # agente ler qualquer arquivo em /home/igor, sem poder escrever la fora do
+  # workspace.
+  jail_paths_leitura: []
   allowlist_binarios:
     - ls
     - cat

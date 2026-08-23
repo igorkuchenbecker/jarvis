@@ -53,6 +53,7 @@ class Executor:
         self,
         registro: RegistroFerramentas,
         jail_paths: list[Path],
+        jail_paths_leitura: tuple[Path, ...] = (),
         allowlist_binarios: tuple[str, ...] = (),
         nivel_autonomia: int = 2,
         solicitar_aprovacao: Callable[[Acao, Ferramenta], bool] | None = None,
@@ -60,6 +61,7 @@ class Executor:
     ) -> None:
         self._registro = registro
         self._jail_paths = jail_paths
+        self._jail_paths_leitura = jail_paths_leitura
         self._allowlist_binarios = allowlist_binarios
         self._nivel_autonomia = nivel_autonomia
         self._solicitar_aprovacao = solicitar_aprovacao
@@ -84,8 +86,18 @@ class Executor:
 
         validar_schema(acao.argumentos, ferramenta.schema_argumentos)
 
+        # Ferramentas READ_ONLY (fs.read/fs.list) podem enxergar raízes extras
+        # só-leitura (jail_paths_leitura), além do jail normal — fs.write
+        # (LOW) nunca vê essas raízes extras, mesmo sendo o mesmo campo
+        # "caminho". Isso permite, por exemplo, ler qualquer coisa em
+        # /home/igor sem abrir permissão de escrita fora do workspace.
+        raizes = (
+            list(self._jail_paths) + list(self._jail_paths_leitura)
+            if ferramenta.risco == NivelRisco.READ_ONLY
+            else self._jail_paths
+        )
         for campo in ferramenta.campos_caminho:
-            resolver_dentro_do_jail(acao.argumentos[campo], self._jail_paths)
+            resolver_dentro_do_jail(acao.argumentos[campo], raizes)
 
         if ferramenta.campo_binario is not None:
             validar_binario_permitido(

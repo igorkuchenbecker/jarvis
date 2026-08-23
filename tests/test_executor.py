@@ -96,6 +96,56 @@ def test_recusa_travessia_de_caminho_maliciosa(tmp_path: Path) -> None:
     assert "fora dos diretórios autorizados" in (resultado.erro or "")
 
 
+def test_fs_read_permite_raiz_de_leitura_extra_fora_do_jail_de_escrita(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    fora = tmp_path / "home"
+    fora.mkdir()
+    (fora / "notas.txt").write_text("fora do workspace")
+    executor = Executor(
+        _registro_com_fs(), jail_paths=[workspace], jail_paths_leitura=(fora,)
+    )
+
+    resultado = executor.executar_acao(Acao("fs.read", {"caminho": str(fora / "notas.txt")}))
+
+    assert resultado.sucesso
+    assert resultado.valor == "fora do workspace"
+
+
+def test_fs_list_permite_raiz_de_leitura_extra_fora_do_jail_de_escrita(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    fora = tmp_path / "home"
+    fora.mkdir()
+    (fora / "a.txt").write_text("a")
+    executor = Executor(
+        _registro_com_fs(), jail_paths=[workspace], jail_paths_leitura=(fora,)
+    )
+
+    resultado = executor.executar_acao(Acao("fs.list", {"caminho": str(fora)}))
+
+    assert resultado.sucesso
+    assert resultado.valor == ["a.txt"]
+
+
+def test_fs_write_recusa_raiz_de_leitura_extra_mesmo_sendo_legivel(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    fora = tmp_path / "home"
+    fora.mkdir()
+    executor = Executor(
+        _registro_com_fs(), jail_paths=[workspace], jail_paths_leitura=(fora,)
+    )
+
+    resultado = executor.executar_acao(
+        Acao("fs.write", {"caminho": str(fora / "novo.txt"), "conteudo": "x"})
+    )
+
+    assert not resultado.sucesso
+    assert "fora dos diretórios autorizados" in (resultado.erro or "")
+    assert not (fora / "novo.txt").exists()
+
+
 def test_registra_auditoria_de_sucesso_e_erro(tmp_path: Path) -> None:
     caminho_auditoria = tmp_path / "auditoria.jsonl"
     (tmp_path / "workspace").mkdir()

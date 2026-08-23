@@ -317,6 +317,30 @@
 - Sem mudança de versão — é dado novo na base de conhecimento indexada pelo M5, não uma
   funcionalidade nova do agente.
 
+### Jail de leitura ampliada (pós-roadmap, a pedido do usuário)
+- Pedido: jarvis devia poder ler qualquer arquivo em `/home/igor`, não só
+  `~/jarvis/workspace`/`~/second-brain`, sem ampliar o que ele pode escrever.
+- `security/executor.py::Executor` ganha `jail_paths_leitura: tuple[Path, ...] = ()`
+  (compatível com chamadas antigas). Em `_executar_validado`, a validação de
+  `campos_caminho` usa `jail_paths + jail_paths_leitura` só quando
+  `ferramenta.risco == NivelRisco.READ_ONLY` — ou seja, só `fs.read`/`fs.list`
+  (as únicas ferramentas READ_ONLY com `campos_caminho` no projeto hoje).
+  `fs.write` (LOW) nunca vê a raiz extra, continua confinado a `jail_paths`.
+- `core/configuracao.py`: nova `ConfiguracaoSeguranca.jail_paths_leitura`,
+  lida de `seguranca.jail_paths_leitura` no `config.yaml` (lista de
+  caminhos, vazia por padrão — comportamento antigo preservado até
+  configurar). `config.yaml.example` documentado; `config.yaml` real
+  (não versionado) do usuário configurado com `jail_paths_leitura: [/home/igor]`.
+- 5 testes novos (3 em `test_executor.py` provando leitura permitida e
+  escrita recusada na raiz extra — o teste "malicioso" da convenção do
+  projeto; 2 em `test_configuracao.py` provando o parsing do YAML).
+- Validado na máquina real contra o `config.yaml` de produção (não só
+  fakes): `fs.read` em `/home/igor/.bashrc` teve sucesso; `fs.write` em
+  `/home/igor/arquivo-novo.txt` foi recusado com "fora dos diretórios
+  autorizados", sem criar o arquivo.
+- Versão `1.1.1` (capacidade nova, mudança pequena e compatível).
+- 217 testes no total, todos verdes (`scripts/check.sh`).
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com

@@ -42,6 +42,10 @@ class ConfiguracaoSeguranca:
     jail_paths: tuple[Path, ...] = field(
         default_factory=lambda: (RAIZ_JARVIS_PADRAO / "workspace",)
     )
+    # Raízes extras visíveis SÓ para ferramentas READ_ONLY (fs.read/fs.list).
+    # fs.write nunca enxerga isto -- continua confinado a jail_paths. Vazio
+    # por padrão (comportamento antigo preservado até o usuário configurar).
+    jail_paths_leitura: tuple[Path, ...] = ()
     allowlist_binarios: tuple[str, ...] = ALLOWLIST_BINARIOS_PADRAO
 
 
@@ -140,6 +144,12 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
                 Path(item).expanduser()
                 for item in seguranca_bruta.get(
                     "jail_paths", [str(p) for p in padroes_seguranca.jail_paths]
+                )
+            ),
+            jail_paths_leitura=tuple(
+                Path(item).expanduser()
+                for item in seguranca_bruta.get(
+                    "jail_paths_leitura", [str(p) for p in padroes_seguranca.jail_paths_leitura]
                 )
             ),
             allowlist_binarios=tuple(

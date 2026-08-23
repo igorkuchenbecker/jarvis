@@ -62,7 +62,10 @@ def criar_ferramentas_fs() -> list[Ferramenta]:
     return [
         Ferramenta(
             nome="fs.read",
-            descricao="Lê o conteúdo de um arquivo de texto dentro do workspace.",
+            descricao=(
+                "Lê o conteúdo de um arquivo de texto dentro do workspace ou de uma raiz de "
+                "leitura autorizada (config seguranca.jail_paths_leitura)."
+            ),
             risco=NivelRisco.READ_ONLY,
             schema_argumentos=SCHEMA_CAMINHO,
             executar=_fs_read,
@@ -70,7 +73,10 @@ def criar_ferramentas_fs() -> list[Ferramenta]:
         ),
         Ferramenta(
             nome="fs.list",
-            descricao="Lista os nomes de arquivos e pastas dentro de um diretório do workspace.",
+            descricao=(
+                "Lista os nomes de arquivos e pastas dentro de um diretório do workspace ou de "
+                "uma raiz de leitura autorizada (config seguranca.jail_paths_leitura)."
+            ),
             risco=NivelRisco.READ_ONLY,
             schema_argumentos=SCHEMA_CAMINHO,
             executar=_fs_list,

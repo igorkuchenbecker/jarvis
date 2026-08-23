@@ -51,6 +51,28 @@ def test_carregar_configuracao_secao_parcial_usa_padroes_para_o_resto(tmp_path: 
     assert configuracao.claude_cli.binario == "claude"
 
 
+def test_carregar_configuracao_sem_arquivo_usa_jail_paths_leitura_vazio(tmp_path: Path) -> None:
+    configuracao = carregar_configuracao(tmp_path / "nao-existe.yaml")
+
+    assert configuracao.seguranca.jail_paths_leitura == ()
+
+
+def test_carregar_configuracao_le_jail_paths_leitura_do_arquivo(tmp_path: Path) -> None:
+    caminho = tmp_path / "config.yaml"
+    caminho.write_text(
+        "seguranca:\n"
+        "  jail_paths:\n"
+        "    - ~/jarvis/workspace\n"
+        "  jail_paths_leitura:\n"
+        "    - /home/igor\n",
+        encoding="utf-8",
+    )
+
+    configuracao = carregar_configuracao(caminho)
+
+    assert configuracao.seguranca.jail_paths_leitura == (Path("/home/igor"),)
+
+
 def test_carregar_configuracao_sem_arquivo_usa_padroes_de_voz(tmp_path: Path) -> None:
     configuracao = carregar_configuracao(tmp_path / "nao-existe.yaml")
 

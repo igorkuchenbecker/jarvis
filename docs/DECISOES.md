@@ -621,3 +621,20 @@ com o texto "pensando...", `\r\x1b[2K` entre frames (limpa a linha pra redesenha
 `\x1b[?25h\r\x1b[1A\x1b[2K` (mostra cursor de novo, sobe uma linha, limpa) imediatamente ANTES da
 linha final `jarvis> Brasília.` aparecer — prova visual completa de que o indicador aparece,
 anima, e desaparece limpo exatamente no intervalo certo, sem sujar a resposta final.
+
+**2026-08-23** | Jail de caminho passa a ter duas raízes: `jail_paths` (leitura+escrita, escopo
+antigo) e `jail_paths_leitura` (só leitura, extra) — aplicada só a ferramentas `NivelRisco.
+READ_ONLY` (`fs.read`/`fs.list`); `fs.write` (LOW) nunca vê a raiz extra | Pedido direto do
+usuário: jarvis devia poder ler qualquer coisa em `/home/igor`, não só workspace/second-brain,
+sem abrir uma porta de escrita mais ampla que isso | (a) simplesmente adicionar `/home/igor` à
+lista `jail_paths` existente — rejeitada porque isso também libera `fs.write` pra escrever em
+qualquer lugar do home, um raio de risco muito maior do que o pedido (só leitura); (b) criar uma
+allowlist por ferramenta em vez de por nível de risco — rejeitada por mais complexa sem benefício
+real, já que hoje só `fs.read`/`fs.list`/`fs.write` declaram `campos_caminho` no projeto inteiro |
+`Executor` ganha parâmetro `jail_paths_leitura: tuple[Path, ...] = ()` (compatível com chamadas
+antigas); em `_executar_validado`, a lista de raízes válidas vira `jail_paths + jail_paths_leitura`
+só quando `ferramenta.risco == NivelRisco.READ_ONLY`, senão continua só `jail_paths`. Config nova
+`seguranca.jail_paths_leitura` em `config.yaml`/`config.yaml.example`. Validado com teste real
+(não só fake) contra o `config.yaml` de produção: `fs.read` em `/home/igor/.bashrc` (fora do
+jail de escrita) teve sucesso; `fs.write` em `/home/igor/arquivo-novo.txt` foi recusado com
+"fora dos diretórios autorizados", confirmando que a ampliação é estritamente só-leitura.

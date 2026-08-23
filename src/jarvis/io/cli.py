@@ -139,6 +139,7 @@ def _construir_executor(configuracao: Configuracao) -> tuple[RegistroFerramentas
     executor = Executor(
         registro,
         jail_paths=list(configuracao.seguranca.jail_paths),
+        jail_paths_leitura=configuracao.seguranca.jail_paths_leitura,
         allowlist_binarios=configuracao.seguranca.allowlist_binarios,
         nivel_autonomia=configuracao.autonomia.nivel,
         solicitar_aprovacao=_solicitar_aprovacao_interativa,
