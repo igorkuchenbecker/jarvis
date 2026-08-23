@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M8 concluídos; M9-M10 restantes)
+**Versão:** 0.1.0 (M0-M9 concluídos; M10 restante)
 **Última atualização:** 2026-08-23
 
 ## Feito
@@ -218,6 +218,30 @@
   `ClaudeCliVisionProvider` com um `claude` falso incluindo verificação de que a imagem em
   base64 chega no stdin, ferramenta `vision.analyze` incluindo a regressão de não-persistência).
 
+### M9 — Computer use controlado
+- `io/entrada.py`: mouse/teclado via `evdev.UInput` (dispositivo virtual no nível do kernel, não
+  `ydotool`/API Lua específica desta build do Hyprland — ver DECISOES.md). `mover_mouse(dx, dy)`,
+  `clicar(botao)`, `digitar(texto)` (ASCII simples, sem acentos — limitação real de XKB/evdev,
+  documentada), `tecla(combinacao)` (ex.: "ctrl+c", "alt+f4", suporta modificadores + tecla).
+- `io/janelas.py`: `listar_janelas()` via `hyprctl clients -j`/`activewindow -j` (JSON, só
+  leitura). Foco de janela por seletor NÃO implementado — testado e confirmado não confiável
+  nesta build do Hyprland (ver DECISOES.md), registrado como pendência conhecida.
+- `tools/computador.py`: `computador.listar_janelas` (READ_ONLY), `computador.mover_mouse`
+  (MEDIUM), `computador.clicar`/`computador.digitar`/`computador.tecla` (**CRITICAL — primeiro
+  uso real desse nível de risco no projeto**, resolvendo a dívida técnica do M3). Todas atrás de
+  `computador.habilitada` (`false` por padrão), além da aprovação interativa obrigatória que
+  HIGH/CRITICAL já exigem.
+- `core/configuracao.py`: `ConfiguracaoComputador` (só `habilitada` por enquanto).
+- 29 testes novos (entrada sintética com UInput falso, listagem de janelas — inclui um teste
+  REAL contra o hyprctl de verdade, mesmo espírito do teste real de `grim` do M7 —, ferramentas
+  de computador, gate de configuração).
+- **Validado na máquina real, com alvo descartável e seguro** (não numa aplicação real do
+  usuário): `scripts/validar_computador_real.py` abre um terminal `kitty` novo rodando só
+  `cat > arquivo`, confirma que ele realmente ficou em foco, digita texto via evdev, confirma
+  movimento real do cursor via `hyprctl cursorpos` antes/depois, e fecha tudo com Enter+Ctrl+D —
+  lê o arquivo de volta e confere que o texto batido é exatamente o esperado. Passou de verdade,
+  sem sujeira deixada no sistema (arquivo e janela removidos pelo próprio script).
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com
@@ -248,8 +272,13 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Dívida técnica
 
-- CRITICAL não tem nenhuma ferramenta ainda (nada no roadmap até aqui precisa desse nível) — o
-  caminho de aprovação já cobre CRITICAL igual a HIGH no código, mas está sem exercício real.
+- CRITICAL agora TEM ferramentas reais (M9: `computador.clicar`/`digitar`/`tecla`) e exercício
+  real via `scripts/validar_computador_real.py` — dívida resolvida.
+- Foco de janela por seletor (classe/endereço/título) não é suportado — só listagem. A API Lua
+  desta build do Hyprland não respondeu de forma confiável para isso (ver DECISOES.md, M9). Não
+  bloqueante: o agente pode listar e agir fisicamente sem trocar foco automaticamente.
+- `digitar()` só suporta ASCII simples, sem acentos — limitação real de evdev/XKB (ver
+  DECISOES.md, M9), não uma omissão descuidada.
 - `jarvis why` identifica o registro pelo índice de exibição (1 = mais recente), não por um ID
   estável — se novas ações forem registradas entre um `jarvis audit` e um `jarvis why N`, o índice
   pode já apontar para outro registro. Aceitável para uso interativo (index visto na hora), mas
@@ -277,9 +306,12 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-M0-M8 concluídos. M8/V1-V4 (STT, TTS, conversa por voz com ferramentas, robustez) fechados em
-2026-08-23, a pedido direto do usuário ("vamos terminar o Jarvis"). Próximo: M9 (Computer use
-controlado) — primeira vez que o projeto vai precisar de ferramentas HIGH/CRITICAL de verdade
-exercitadas (controle de mouse/teclado/janelas), o que exige pesquisar as opções nativas de
-Wayland/Hyprland (não X11 — `pyautogui`/`xdotool` não funcionam aqui) antes de implementar.
-Depois: M10 (Integração 1.0).
+M0-M9 concluídos, todos em 2026-08-23 na mesma sessão, a pedido direto do usuário ("vamos
+terminar o Jarvis"). M9 (computer use: mouse/teclado via evdev, listagem de janelas via hyprctl,
+primeiro uso real de CRITICAL) validado na máquina real com um alvo descartável e seguro.
+Próximo e último: M10 (Integração 1.0) — momento de revisar o projeto como um todo (não uma
+fatia isolada): conferir que `jarvis` (conversa), `jarvis run` (goals), `jarvis voz falar`,
+`jarvis indexar`, `computador.*` (com `computador.habilitada: true`) funcionam juntos de forma
+coerente, revisar `README.md`/`config.yaml.example` estão com todas as seções documentadas,
+decidir se falta algum polimento de UX/CLI antes de considerar 1.0, e dar o resumo final do
+projeto inteiro.

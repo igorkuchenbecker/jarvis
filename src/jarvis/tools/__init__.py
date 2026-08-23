@@ -7,6 +7,7 @@ from jarvis.memory.armazenamento import RepositorioMemoria
 from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.providers import ErroProvider, criar_provider_visao
 from jarvis.tools.base import Ferramenta, NivelRisco
+from jarvis.tools.computador import criar_ferramentas_computador
 from jarvis.tools.conhecimento import criar_ferramentas_conhecimento
 from jarvis.tools.fs import criar_ferramentas_fs
 from jarvis.tools.memoria import criar_ferramentas_memoria
@@ -44,6 +45,10 @@ def criar_registro_ferramentas_padrao(configuracao: Configuracao) -> RegistroFer
         provider_visao = None
     if provider_visao is not None:
         for ferramenta in criar_ferramentas_visao(provider_visao):
+            registro.registrar(ferramenta)
+
+    if configuracao.computador.habilitada:
+        for ferramenta in criar_ferramentas_computador():
             registro.registrar(ferramenta)
 
     return registro

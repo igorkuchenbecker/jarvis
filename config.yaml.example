@@ -41,6 +41,10 @@ caminhos:
 conhecimento:
   diretorios: []  # ex: ["~/Documentos"] — só o que estiver aqui pode ser indexado/consultado
 
+computador:
+  habilitada: false  # liga as ferramentas computador.* (mouse/teclado/janelas, M9)
+  # CRITICAL: clicar/digitar/tecla sempre pedem aprovacao interativa, mesmo com isso ligado.
+
 voz:
   habilitada: false
   stt_modelo: small  # tamanho do modelo faster-whisper: tiny|base|small|medium|large-v3

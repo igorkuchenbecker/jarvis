@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from jarvis.core.configuracao import Configuracao, ConfiguracaoCaminhos
+from jarvis.core.configuracao import Configuracao, ConfiguracaoCaminhos, ConfiguracaoComputador
 from jarvis.tools import criar_registro_ferramentas_padrao
 from jarvis.tools.base import Ferramenta, NivelRisco
 from jarvis.tools.registro import RegistroFerramentas
@@ -77,4 +77,35 @@ def test_criar_registro_ferramentas_padrao_inclui_fs_e_memoria(tmp_path: Path) -
         "terminal.exec",
         "conhecimento.buscar",
         "vision.analyze",
+    } <= nomes
+
+
+def test_criar_registro_ferramentas_padrao_nao_inclui_computador_por_padrao(
+    tmp_path: Path,
+) -> None:
+    configuracao = Configuracao(caminhos=ConfiguracaoCaminhos(banco_dados=tmp_path / "jarvis.db"))
+
+    registro = criar_registro_ferramentas_padrao(configuracao)
+
+    nomes = {ferramenta.nome for ferramenta in registro.todas()}
+    assert not any(nome.startswith("computador.") for nome in nomes)
+
+
+def test_criar_registro_ferramentas_padrao_inclui_computador_quando_habilitado(
+    tmp_path: Path,
+) -> None:
+    configuracao = Configuracao(
+        caminhos=ConfiguracaoCaminhos(banco_dados=tmp_path / "jarvis.db"),
+        computador=ConfiguracaoComputador(habilitada=True),
+    )
+
+    registro = criar_registro_ferramentas_padrao(configuracao)
+
+    nomes = {ferramenta.nome for ferramenta in registro.todas()}
+    assert {
+        "computador.listar_janelas",
+        "computador.mover_mouse",
+        "computador.clicar",
+        "computador.digitar",
+        "computador.tecla",
     } <= nomes

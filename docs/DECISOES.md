@@ -476,3 +476,78 @@ já prevê `voz.habilitada: false` por padrão; quem não usa voz não deveria p
 `faster-whisper`/`ctranslate2` (dependência pesada) só para instalar o `jarvis` | Colocar tudo nas
 dependências base — rejeitada por inflar a instalação padrão para quem só quer o modo texto |
 Ambiente de desenvolvimento instala com `pip install -e ".[dev,voz]"`; produção decide conforme uso.
+
+---
+
+## M9 — Computer use controlado
+
+**2026-08-23** | Entrada sintética (mouse/teclado) via `evdev.UInput` (dispositivo virtual no
+nível do kernel), não `ydotool`/`wtype`/`wlrctl` | Nenhuma dessas ferramentas estava instalada, e
+instalar qualquer uma exigiria `sudo pacman -S` — uma ação que não posso tomar sem aprovação
+explícita do usuário. Verificado que `/dev/uinput` já tem ACL `user:igor:rw-` concedida por uma
+regra udev do KDE Connect (`40-kdeconnect-uinput.rules`), então dava pra sintetizar entrada sem
+sudo nenhum, só instalando a biblioteca Python `evdev` (`pip install evdev`, sem tocar no
+sistema) | (a) `ydotool` — rejeitada por exigir instalação de pacote + serviço `ydotoold` via
+sudo; (b) a API Lua nativa desta build do Hyprland (`hl.dsp.cursor.move`/`hl.dsp.send_key_state`,
+descoberta via `hyprctl repl` — não documentada em lugar nenhum) — testada e PARCIALMENTE
+funcional: `hl.dsp.cursor.move({x,y})` de fato move o cursor real (confirmado via `hyprctl
+cursorpos` antes/depois), mas `hl.dsp.focus({window="class:X"})` retorna sucesso sem fazer nada
+de verdade (só `direction=` funcionou), e não existe uma função de clique de mouse na API
+descoberta — comportamento inconsistente/não confiável demais pra expor como ferramenta sem mais
+investigação, desproporcional ao valor pra esta fatia | `evdev.UInput` funciona no nível do
+kernel: é compatível com qualquer compositor (Wayland/X11), não depende de peculiaridades desta
+build específica do Hyprland. Único requisito de sistema (ACL em `/dev/uinput`) já estava
+satisfeito nesta máquina; se não estivesse, seria bloqueante e exigiria pedir ao usuário (regra
+"só perguntar se fisicamente bloqueante").
+
+**2026-08-23** | `digitar()` suporta só ASCII simples (letras, dígitos, espaço, pontuação comum
+mapeada manualmente) — sem acentos/Unicode | Evdev expõe *posições físicas de tecla*, não
+caracteres; o caractere que sai de uma tecla física depende do layout XKB ativo no sistema, que
+este módulo não controla nem consulta. Suportar "ã", "ç" etc. corretamente exigiria descobrir o
+layout ativo e mapear pra sequências de tecla mortas ou keycodes específicos do layout — escopo
+desproporcional ao valor de M9 nesta fatia | Tentar mapear estaticamente para um layout
+pt-BR assumido — rejeitada por quebrar silenciosamente em qualquer máquina/sessão com layout
+diferente (US intl, etc.), pior que simplesmente recusar com erro claro | `digitar()` levanta
+`EntradaIndisponivel` apontando o caractere exato não suportado, ANTES de digitar qualquer coisa
+(valida a string inteira primeiro) — nunca digita parcialmente algo diferente do pedido.
+
+**2026-08-23** | `computador.clicar`/`computador.digitar`/`computador.tecla` são
+`NivelRisco.CRITICAL` — primeiro uso real desse nível no projeto (a dívida técnica registrada
+desde o M3 dizia "CRITICAL... sem exercício real") | Diferente de `terminal.exec` (MEDIUM, com
+allowlist de binário), não existe um jeito de "restringir com segurança" o que pode ser
+clicado/digitado — qualquer clique ou tecla pode ter qualquer efeito dependendo do que está em
+foco na tela do usuário (enviar uma mensagem, confirmar uma compra, fechar algo sem salvar).
+`computador.mover_mouse` fica MEDIUM (mover sozinho raramente causa efeito real, mas já é ação
+física visível) | Classificar como HIGH (mesmo nível de `proc.kill`) — rejeitada por HIGH e
+CRITICAL hoje se comportarem igual no código (ambos exigem aprovação interativa sempre), mas a
+intenção semântica de "pode fazer literalmente qualquer coisa, sem allowlist possível" é mais
+forte que "termina um processo específico que já existe" — vale a distinção mesmo sem efeito
+prático hoje, para o dia em que HIGH e CRITICAL divergirem de comportamento | Toda ferramenta
+`computador.*` também fica atrás de `computador.habilitada` (`false` por padrão em
+`config.yaml.example`) — defesa em profundidade além da aprovação obrigatória: se desligado, o
+LLM nem vê essas ferramentas na lista disponível, mesmo padrão já usado para `voz.habilitada`.
+
+**2026-08-23** | Foco de janela por seletor (classe/endereço/título) NÃO foi implementado como
+ferramenta nesta fatia, só listagem (`computador.listar_janelas`, READ_ONLY, via `hyprctl clients
+-j`) | Testado e confirmado que `hl.dsp.focus({window="class:X"})` retorna sucesso sem mudar o
+foco de verdade nesta build do Hyprland (só `direction=` funciona) — expor uma ferramenta que
+"funciona às vezes" silenciosamente seria pior que não ter a ferramenta | Investigar mais a fundo
+a API Lua até achar a sintaxe certa — adiada por ser tempo desproporcional ao valor: o agente já
+consegue *ler* o que está aberto (`listar_janelas`) e *agir* fisicamente (mouse/teclado) sem
+depender de troca de foco automatizada; o usuário pode focar manualmente a janela certa antes de
+pedir uma ação, ou o agente pode usar `computador.clicar` sobre a janela alvo pra focá-la
+(clicar em uma janela normalmente já a traz ao foco, efeito colateral conhecido do compositor) |
+Registrado como pendência conhecida, não bloqueante, em PROJECT_STATE.md.
+
+**2026-08-23** | Validação real do M9 feita com um alvo descartável e seguro (terminal `kitty`
+novo rodando só `cat > arquivo`, fechado com Ctrl+D), não clicando/digitando em uma aplicação
+real do usuário | Clicar/digitar têm efeito real na sessão gráfica; testar contra algo real e
+não-controlado poderia ter consequências não planejadas (mensagem enviada, ação irreversível) |
+Pular validação real e confiar só nos testes com fakes — rejeitada pela mesma razão de todo
+marco anterior: fakes provam que o CÓDIGO roda certo, não que o EFEITO real acontece (ex.: M8
+achou bugs reais que nenhum fake capturaria) | `scripts/validar_computador_real.py`: confirma
+movimento real do cursor (`hyprctl cursorpos` antes/depois), digitação real de texto correto
+numa janela genuinamente focada, e uma tecla de combinação (Ctrl+D) entregue e interpretada
+corretamente pelo TTY real. **Bug real encontrado no script de validação (não na ferramenta)**:
+Ctrl+D com uma linha de terminal pendente (sem Enter antes) só libera o buffer pro processo
+leitor, não sinaliza EOF de verdade — corrigido enviando Enter antes do Ctrl+D final.

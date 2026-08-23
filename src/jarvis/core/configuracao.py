@@ -43,6 +43,11 @@ class ConfiguracaoConhecimento:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoComputador:
+    habilitada: bool = False
+
+
+@dataclass(frozen=True)
 class ConfiguracaoVoz:
     habilitada: bool = False
     stt_modelo: str = "small"
@@ -75,6 +80,7 @@ class Configuracao:
     caminhos: ConfiguracaoCaminhos = field(default_factory=ConfiguracaoCaminhos)
     conhecimento: ConfiguracaoConhecimento = field(default_factory=ConfiguracaoConhecimento)
     voz: ConfiguracaoVoz = field(default_factory=ConfiguracaoVoz)
+    computador: ConfiguracaoComputador = field(default_factory=ConfiguracaoComputador)
 
 
 def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao:
@@ -90,12 +96,14 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     caminhos_brutos = bruto.get("caminhos") or {}
     conhecimento_bruto = bruto.get("conhecimento") or {}
     voz_bruta = bruto.get("voz") or {}
+    computador_bruto = bruto.get("computador") or {}
 
     padroes_caminhos = ConfiguracaoCaminhos()
     padroes_seguranca = ConfiguracaoSeguranca()
     padroes_limites = ConfiguracaoLimites()
     padroes_autonomia = ConfiguracaoAutonomia()
     padroes_voz = ConfiguracaoVoz()
+    padroes_computador = ConfiguracaoComputador()
 
     return Configuracao(
         llm_padrao=provedor.get("llm_padrao", "claude_cli"),
@@ -151,5 +159,8 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             duracao_captura_segundos=voz_bruta.get(
                 "duracao_captura_segundos", padroes_voz.duracao_captura_segundos
             ),
+        ),
+        computador=ConfiguracaoComputador(
+            habilitada=computador_bruto.get("habilitada", padroes_computador.habilitada),
         ),
     )

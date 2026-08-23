@@ -72,7 +72,7 @@ M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) 
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
 M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão
 (concluído) · M8 Voz (concluído, fora de ordem — ver abaixo) · M9 Computer use controlado
-(próximo) · M10 Integração 1.0.
+(concluído — ver abaixo) · M10 Integração 1.0 (próximo e último).
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -95,6 +95,22 @@ multi-idioma além do pt-BR. STT roda em CPU (não GPU) por padrão — decisão
 dívida, ver `docs/DECISOES.md`.
 
 Estado detalhado de cada fatia (V0/V1/V2/V3/V4): `docs/PROJECT_STATE.md`.
+
+## M9 — Computer use controlado (concluído)
+
+Mouse/teclado sintéticos via `evdev.UInput` (dispositivo virtual no nível do kernel — não
+`ydotool` nem a API Lua específica desta build do Hyprland, ambas descartadas por motivos
+registrados em `docs/DECISOES.md`). `io/entrada.py` (mover_mouse/clicar/digitar/tecla),
+`io/janelas.py` (listar_janelas, só leitura via hyprctl), `tools/computador.py`
+(`computador.listar_janelas` READ_ONLY, `computador.mover_mouse` MEDIUM,
+`computador.clicar`/`digitar`/`tecla` **CRITICAL** — primeiro uso real desse nível de risco no
+projeto). Tudo atrás de `computador.habilitada` (`false` por padrão) além da aprovação
+interativa que HIGH/CRITICAL já exigem sempre.
+
+Foco de janela por seletor (não só listagem) ficou de fora — a API Lua desta build do Hyprland
+não respondeu de forma confiável para isso em teste manual (só foco por direção funcionou de
+verdade). `digitar()` só suporta ASCII sem acentos (limitação real de evdev/XKB, não descuido).
+Ambos registrados como pendência conhecida em `docs/PROJECT_STATE.md`, não bloqueantes.
 
 ## M1 — Core conversacional (concluído fora de ordem)
 
