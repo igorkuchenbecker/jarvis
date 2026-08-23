@@ -1,7 +1,7 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M7 concluídos; M8/V0 — Fundação de áudio)
-**Última atualização:** 2026-08-22
+**Versão:** 0.1.0 (M0-M8 concluídos; M9-M10 restantes)
+**Última atualização:** 2026-08-23
 
 ## Feito
 
@@ -34,6 +34,38 @@
   usando o dispositivo `default` (índice 8, roteado por PipeWire). Um bug real foi encontrado e
   corrigido nesta fatia (ver Bugs conhecidos/DECISOES.md).
 - 17 testes (auditoria, logs, áudio, CLI) — todos com Fakes/monkeypatch, sem tocar hardware real.
+
+### M8/V1-V4 — STT, TTS, conversa por voz com ferramentas, robustez (retomado e concluído)
+- `providers/base.py`: protocolos `STTProvider`/`TTSProvider` (numpy só sob `TYPE_CHECKING`,
+  `from __future__ import annotations` evita import obrigatório em runtime).
+- `providers/stt.py`: `WhisperSTTProvider` real (faster-whisper, CPU/int8 por padrão — ver
+  DECISOES.md sobre não usar CUDA ainda). `transcrever(sinal, taxa)` valida 16000Hz, erro
+  amigável para áudio vazio/sem fala detectada/falha do modelo.
+- `providers/tts.py`: `PiperTTSProvider` real (pacote `piper-tts`), baixa o modelo da voz
+  automaticamente em `caminhos.modelos_voz` no primeiro uso. `sintetizar(texto) ->
+  (sinal, taxa)`.
+- `providers/fake.py`: `FakeSTTProvider`/`FakeTTSProvider` roteirizados, mesmo padrão do
+  `FakeProvider` já existente.
+- `core/configuracao.py`: `ConfiguracaoVoz` (habilitada, stt_modelo, dispositivo,
+  taxa_amostragem, idioma, tts_voz, duracao_captura_segundos) e `caminhos.modelos_voz` —
+  fecha a dívida técnica "`io/audio.py` não consulta config" (agora `io/cli.py` consulta via
+  `criar_provider_stt`/`criar_provider_tts`/`_comando_voz_falar`).
+- `io/cli.py`: `jarvis voz falar` — conversa por voz push-to-talk (ENTER grava, `aparar_silencio`
+  apara as pontas, STT transcreve, **`processar_turno` roda com ferramentas de verdade** — não
+  mais o "LLM direto sem tools" cogitado antes de M1/M2 existirem —, resposta impressa em texto e
+  falada via TTS). Atrás do gate `voz.habilitada` (antes só documentado, agora checado de
+  verdade).
+- Robustez (V4): erro de microfone/transcrição/reprodução em um turno não trava o loop — o
+  próximo turno continua normalmente; teste E2E prova uma ferramenta real (`fs.list`) executada e
+  citada na resposta falada, não só texto solto.
+- 24 testes novos (STT, TTS, config de voz, CLI de voz) — todos com Fakes/monkeypatch.
+- **Validado na máquina real, além dos testes com fakes**: `scripts/validar_voz_real.py` faz um
+  round-trip TTS→STT de verdade (Piper sintetiza "o rato roeu a roupa do rei de roma", Whisper
+  transcreve reconhecendo a frase) — e reprodução real via `tocar()` a 22050Hz (taxa nativa do
+  Piper) funciona sem ajuste, confirmando que o design "device=None" do V0 já cobre taxas
+  distintas. Script não faz parte da suíte de testes (baixa modelos reais / usa rede na primeira
+  vez) — é validação manual, mesmo espírito do "não dá pra ouvir o beep" do V0, só que aqui dá
+  pra checar objetivamente o texto transcrito em vez de precisar de um humano ouvindo.
 
 ### M1 — Core conversacional (fora de ordem, a pedido do usuário)
 - `core/configuracao.py`: `carregar_configuracao()` lê `~/jarvis/config.yaml` (opcional) com
@@ -222,20 +254,17 @@ confirmada por um humano ao rodar `jarvis voz check`.
   estável — se novas ações forem registradas entre um `jarvis audit` e um `jarvis why N`, o índice
   pode já apontar para outro registro. Aceitável para uso interativo (index visto na hora), mas
   não é uma referência estável entre sessões.
-- Isso é relevante para o M8: a fatia V3 (conversa por voz ponta-a-ponta) foi projetada para
-  depender do "mesmo core loop do chat textual" e de "ferramentas já existentes" — agora ambos
-  existem (M1+M2), então V3 pode religar de verdade ao `processar_turno` com ferramentas, não mais
-  precisar do escopo reduzido registrado antes em DECISOES.md. Revisitar aquela decisão quando V3
-  for retomado.
-- `config.yaml.example`: `autonomia`, `limites` e `voz` ainda não têm código que os leia (`voz`
-  é lido só pela documentação, o `io/audio.py` do M8 ainda não consulta config). `provedor.*`,
-  `seguranca.jail_paths` e `caminhos.*` já são lidos.
+- `config.yaml.example`: `autonomia` e `limites` ainda não têm código que os leia. `voz` agora É
+  lido de verdade (resolvido no M8/V1-V4). `provedor.*`, `seguranca.jail_paths`, `caminhos.*` e
+  `voz.*` já são lidos.
 - `AnthropicProvider`/`OpenAICompatProvider` não implementados; `criar_provider_llm()` só aceita
   `llm_padrao: claude_cli` por enquanto (qualquer outro valor levanta `ErroProvider`).
 - Streaming (`stream-json`) não implementado — `ClaudeCliProvider` usa `--output-format json`
   síncrono (decisão registrada, não é dívida bloqueante, só uma melhoria futura possível).
-- STT (`WhisperSTTProvider`), TTS (`PiperTTSProvider`) e o modo `jarvis voz` (M8/V1-V4) ainda não
-  foram implementados.
+- `voz.dispositivo` só suporta `"auto"` de verdade — mapear um valor específico para um índice de
+  dispositivo exigiria correspondência difusa de nome, não implementada (M8/V4, não bloqueante).
+- STT usa CPU (não GPU) por padrão mesmo com RTX 2060 disponível — decisão deliberada (ver
+  DECISOES.md), não dívida involuntária; reavaliar só se latência real exigir.
 
 ## Dívida técnica (M4)
 
@@ -248,8 +277,9 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-M0-M7 concluídos nesta sessão (M1/M8-V0 fora de ordem, a pedido do usuário; M6 concluído como
-"avaliado, não adotado"). Sessão pausada a pedido do usuário logo após a correção de privacidade
-do M7. Não decidido ainda: retomar M8 pelas fatias V1-V4 (STT/TTS/voz ponta-a-ponta, cujo escopo
-de V3 pode agora ser o completo, com tool-calling, já que M1+M2 existem) ou seguir M9 (Computer
-use controlado). Esperar sinal do usuário na próxima sessão.
+M0-M8 concluídos. M8/V1-V4 (STT, TTS, conversa por voz com ferramentas, robustez) fechados em
+2026-08-23, a pedido direto do usuário ("vamos terminar o Jarvis"). Próximo: M9 (Computer use
+controlado) — primeira vez que o projeto vai precisar de ferramentas HIGH/CRITICAL de verdade
+exercitadas (controle de mouse/teclado/janelas), o que exige pesquisar as opções nativas de
+Wayland/Hyprland (não X11 — `pyautogui`/`xdotool` não funcionam aqui) antes de implementar.
+Depois: M10 (Integração 1.0).

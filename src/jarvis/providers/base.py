@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class ErroProvider(Exception):
@@ -23,4 +26,17 @@ class LLMProvider(Protocol):
 class VisionProvider(Protocol):
     def analisar(self, caminho_imagem: Path, pergunta: str) -> str:
         """Analisa uma imagem local e responde à pergunta sobre ela, sem manter sessão."""
+        ...
+
+
+class STTProvider(Protocol):
+    def transcrever(self, sinal: np.ndarray, taxa_amostragem: int) -> str:
+        """Transcreve um sinal de áudio mono (float32) para texto. Levanta ErroProvider se
+        o áudio estiver vazio/sem fala detectável ou se o modelo falhar."""
+        ...
+
+
+class TTSProvider(Protocol):
+    def sintetizar(self, texto: str) -> tuple[np.ndarray, int]:
+        """Sintetiza texto em fala, retornando (sinal mono float32, taxa de amostragem)."""
         ...

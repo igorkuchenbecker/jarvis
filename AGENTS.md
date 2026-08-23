@@ -71,25 +71,30 @@ ruff + mypy --strict + pytest.
 M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) · M2 Tool calling
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
 M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão
-(concluído) · M8 Voz (em andamento, fora de ordem — ver abaixo) · M9 Computer use controlado ·
-M10 Integração 1.0.
+(concluído) · M8 Voz (concluído, fora de ordem — ver abaixo) · M9 Computer use controlado
+(próximo) · M10 Integração 1.0.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
 
-## M8 — Voz (fatias V0-V4)
+## M8 — Voz (fatias V0-V4, concluído)
 
-Solicitado diretamente antes de M1-M7 existirem. V0 (fundação de áudio) e V1-V2 (STT/TTS) não
-dependem de core loop nem de tools, então avançam normalmente. V3 (conversa por voz ponta-a-ponta)
-foi projetado assumindo um core loop e ferramentas que ainda não existem — decisão registrada em
-`docs/DECISOES.md`: quando V3 chegar, o escopo é reduzido para voz → `LLMProvider` direto (sem
-tool-calling), até M1/M2 serem construídos de verdade.
+Solicitado diretamente antes de M1-M7 existirem. V0 (fundação de áudio) foi construído fora de
+ordem primeiro. V1 (STT, `WhisperSTTProvider`/faster-whisper), V2 (TTS, `PiperTTSProvider`/Piper)
+e V3 (conversa por voz push-to-talk, `jarvis voz falar`) foram retomados e concluídos depois que
+M1 (core loop) e M2 (tools/executor) já existiam — por isso V3 usa o `processar_turno` COMPLETO,
+com ferramentas de verdade, não a ponte reduzida "texto direto a um LLMProvider" cogitada quando
+M8 começou (decisão revisitada e substituída, ver `docs/DECISOES.md`). V4 (escopo definido só ao
+fechar o marco, nunca detalhado no roteiro original) cobriu robustez: erro de
+microfone/transcrição/reprodução num turno não trava o loop de voz, e um teste E2E prova uma
+ferramenta real executada e citada na resposta falada.
 
-Fora de escopo nesta missão (registrar como próximos passos, não implementar): wake word, escuta
+Fora de escopo (permanece fora do roadmap inteiro, não só desta missão): wake word, escuta
 contínua, barge-in, hotkey global do Hyprland, streaming de tokens falados, diarização,
-multi-idioma além do pt-BR.
+multi-idioma além do pt-BR. STT roda em CPU (não GPU) por padrão — decisão deliberada, não
+dívida, ver `docs/DECISOES.md`.
 
-Estado detalhado de qual fatia (V0/V1/V2/V3/V4) está feita: `docs/PROJECT_STATE.md`.
+Estado detalhado de cada fatia (V0/V1/V2/V3/V4): `docs/PROJECT_STATE.md`.
 
 ## M1 — Core conversacional (concluído fora de ordem)
 

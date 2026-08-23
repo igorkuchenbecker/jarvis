@@ -90,6 +90,63 @@ com `voz.dispositivo: auto` agora significa "não fixar nenhum índice, deixar o
 não "primeiro da lista". `dispositivo_padrao_do_sistema()` existe só para exibição amigável do
 nome do dispositivo ao usuário; a escolha real de rota de áudio é sempre feita pelo PortAudio.
 
+**2026-08-23** | M8/V1 (STT): `WhisperSTTProvider` usa `faster-whisper` com `device="cpu"` e
+`compute_type="int8"` como padrão, não `device="auto"`/CUDA, mesmo com RTX 2060 disponível |
+Rodar CTranslate2 em GPU exige cuDNN/cuBLAS compatíveis instalados no sistema, o que nunca foi
+validado nesta máquina; falhar silenciosamente ou com um erro obscuro na primeira execução por
+causa de uma biblioteca de sistema ausente é pior do que começar simples e funcionando | (a)
+`device="auto"` — rejeitada por poder falhar de formas difíceis de diagnosticar se o stack CUDA
+do sistema não bater com o que CTranslate2 espera, sem benefício medido (nenhum benchmark
+mostrou que CPU é lento demais para uso interativo push-to-talk) | Validado na máquina real:
+modelo "small" em CPU carrega em ~10s e transcreve uma frase de ~2s de áudio em ~3s — aceitável
+para conversa por voz não teleimediata. Reavaliar GPU só se um caso de uso real exigir latência
+menor, com benchmark antes de trocar o default.
+
+**2026-08-23** | M8/V2 (TTS): Piper via pacote `piper-tts` (não o binário standalone/CLI
+tradicional do projeto Piper) | `piper-tts` é instalável via pip, roda em processo (sem precisar
+gerenciar um subprocess feito à mão como o `ClaudeCliProvider` faz para o `claude`), inclui
+`onnxruntime` e uma API Python (`PiperVoice.load()`/`.synthesize()`) que devolve
+`np.ndarray` diretamente — encaixa no mesmo formato de dado (float32 mono) usado por todo
+`io.audio` e pelo STT, sem conversão extra | Baixar e invocar o binário `piper` standalone via
+subprocess — rejeitada por exigir gerenciar um binário externo separado (download, permissão de
+execução, parsing de stdout) quando a biblioteca Python já resolve isso nativamente | Modelo de
+voz (`pt_BR-faber-medium`, .onnx + .onnx.json) baixado automaticamente no primeiro uso, salvo em
+`caminhos.modelos_voz` (`~/jarvis/dados/modelos_voz` por padrão) — uso subsequente não precisa de
+rede. Validado na máquina real com um round-trip TTS→STT (`scripts/validar_voz_real.py`): Piper
+sintetiza "o rato roeu a roupa do rei de roma", Whisper transcreve de volta reconhecendo a frase
+(com pequenas imprecisões esperadas de um modelo "small" numa voz sintética, não um erro do
+pipeline) — e reprodução real via `tocar()` a 22050Hz (taxa nativa do Piper, diferente dos
+16000Hz usados no resto do pipeline) funciona sem ajuste extra, confirmando que o design
+"device=None, deixa o PipeWire resample" do M8/V0 já cobre taxas de amostragem distintas.
+
+**2026-08-23** | M8/V3 (conversa por voz): implementada com o core loop COMPLETO
+(`processar_turno` do M2, com tool-calling), não a ponte reduzida "texto direto a um
+LLMProvider" cogitada quando M8 começou (ver decisão do topo desta seção) | M1 (core loop) e M2
+(tools/executor) já existem desde que foram construídos fora de ordem — a dívida técnica
+registrada explicitamente previa isso ("revisitar aquela decisão quando V3 for retomado") |
+Manter o escopo reduzido mesmo com M1/M2 disponíveis — rejeitada por deixar voz estruturalmente
+mais fraca que o modo texto sem motivo, quando o custo de religar ao `processar_turno` é baixo
+(mesma assinatura já usada em `_executar_conversa`) | `_executar_conversa_voz()` em `io/cli.py`:
+push-to-talk via ENTER (grava `voz.duracao_captura_segundos`, apara silêncio das pontas com
+`aparar_silencio` do V0), STT transcreve, `processar_turno` roda com ferramentas de verdade,
+resposta é impressa em texto E falada via TTS. Comando `jarvis voz falar`, atrás do gate
+`voz.habilitada` (antes só documentado, agora realmente checado). Testado com fakes cobrindo uma
+ferramenta real (`fs.list`) executada e citada na resposta falada — não só texto solto.
+
+**2026-08-23** | M8/V4 (robustez, escopo definido nesta fatia): o roteiro original nomeava
+"V0-V4" mas nunca detalhava o que V4 cobre | Alguém precisa decidir o escopo pra fechar o marco;
+sem isso M8 fica indefinidamente "quase pronto" | Não definir V4 e considerar V3 como o fim do
+marco — rejeitada por deixar lacunas de robustez conhecidas sem tratamento explícito (erro de
+microfone/saída de áudio ausente durante o loop, ausência de teste cobrindo ferramenta real por
+voz) | V4 = fechar as lacunas de robustez do modo voz: (1) teste E2E com ferramenta real (não só
+resposta em texto) pelo caminho de voz; (2) falha de reprodução de áudio (`AudioIndisponivel` ao
+tocar a resposta) não trava o loop — o próximo turno continua normalmente, só a fala daquela
+resposta específica falha; (3) `voz.dispositivo` documentado como suportando só `"auto"` por
+enquanto (mapear um índice específico por nome exigiria correspondência difusa de nome de
+dispositivo, não implementada — dívida técnica registrada, não bloqueante). Fora do escopo de V4
+(continuam fora do roadmap inteiro, ver AGENTS.md): wake word, escuta contínua, barge-in, hotkey
+global, streaming de fala, diarização, outros idiomas além de pt/en.
+
 ---
 
 ## M1 — Core conversacional

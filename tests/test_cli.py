@@ -1,16 +1,20 @@
 import argparse
+import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
-from jarvis.core.configuracao import Configuracao, ConfiguracaoCaminhos
+from jarvis.core.configuracao import Configuracao, ConfiguracaoCaminhos, ConfiguracaoVoz
 from jarvis.io import cli
-from jarvis.io.audio import DispositivoAudio
+from jarvis.io.audio import AudioIndisponivel, DispositivoAudio
 from jarvis.observability.auditoria import RegistradorAuditoria, RegistroAuditoria
 from jarvis.providers.base import ErroProvider
-from jarvis.providers.fake import FakeProvider
+from jarvis.providers.fake import FakeProvider, FakeSTTProvider, FakeTTSProvider
+from jarvis.security.executor import Executor
 from jarvis.tools import RegistroFerramentas
+from jarvis.tools.fs import criar_ferramentas_fs
 
 
 def _entradas(*textos: str) -> Any:
@@ -260,3 +264,202 @@ def test_voz_check_avisa_sem_quebrar_quando_nao_ha_microfone(
     cli._comando_voz_check(argparse.Namespace())
 
     assert "nenhum microfone encontrado" in capsys.readouterr().out
+
+
+def _executor_com_ferramentas_fs(tmp_path: Path) -> Executor:
+    registro = RegistroFerramentas()
+    for ferramenta in criar_ferramentas_fs():
+        registro.registrar(ferramenta)
+    return Executor(registro, jail_paths=[tmp_path])
+
+
+def test_voz_falar_roteia_para_o_comando_certo() -> None:
+    analisador = cli._construir_analisador()
+    argumentos = analisador.parse_args(["voz", "falar"])
+
+    assert argumentos.funcao is cli._comando_voz_falar
+
+
+def test_executar_conversa_voz_transcreve_processa_e_fala_a_resposta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal)
+
+    chamadas_tocar: list[tuple[Any, int]] = []
+    monkeypatch.setattr(
+        cli, "tocar", lambda sinal, taxa: chamadas_tocar.append((sinal, taxa))
+    )
+
+    provider = FakeProvider(["Brasília é a capital do Brasil."])
+    executor = _executor_com_ferramentas_fs(tmp_path)
+    stt = FakeSTTProvider(["qual é a capital do brasil?"])
+    tts = FakeTTSProvider(taxa_amostragem=22050)
+
+    cli._executar_conversa_voz(provider, executor, stt, tts, 6.0, 16000)
+
+    saida = capsys.readouterr().out
+    assert "qual é a capital do brasil?" in saida
+    assert "Brasília é a capital do Brasil." in saida
+    assert stt.historico[0][1] == 16000
+    assert tts.historico == ["Brasília é a capital do Brasil."]
+    assert len(chamadas_tocar) == 1
+    assert chamadas_tocar[0][1] == 22050
+
+
+def test_executar_conversa_voz_executa_ferramenta_de_verdade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """M8/V4: fecha a divida tecnica de V3 — prova que ferramentas de verdade (não só texto)
+    funcionam pelo caminho de voz, exatamente como já funcionavam pelo caminho de texto (M2).
+    """
+    (tmp_path / "a.txt").write_text("conteudo")
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal)
+    monkeypatch.setattr(cli, "tocar", lambda sinal, taxa: None)
+
+    provider = FakeProvider(
+        [
+            json.dumps(
+                {"tipo": "acao", "ferramenta": "fs.list", "argumentos": {"caminho": str(tmp_path)}}
+            ),
+            "O único arquivo é a.txt.",
+        ]
+    )
+    executor = _executor_com_ferramentas_fs(tmp_path)
+    stt = FakeSTTProvider(["liste os arquivos do meu workspace"])
+    tts = FakeTTSProvider()
+
+    cli._executar_conversa_voz(provider, executor, stt, tts, 6.0, 16000)
+
+    saida = capsys.readouterr().out
+    assert "executou fs.list" in saida
+    assert "O único arquivo é a.txt." in saida
+    assert tts.historico == ["O único arquivo é a.txt."]
+
+
+def test_executar_conversa_voz_avisa_quando_nao_ouve_nada(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal[:0])
+
+    stt = FakeSTTProvider([])
+    tts = FakeTTSProvider()
+
+    cli._executar_conversa_voz(
+        FakeProvider([]), Executor(RegistroFerramentas(), jail_paths=[]), stt, tts, 6.0, 16000
+    )
+
+    assert "não ouvi nada" in capsys.readouterr().out
+    assert stt.historico == []
+
+
+def test_executar_conversa_voz_mostra_erro_quando_microfone_falha(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+
+    def _capturar_com_falha(duracao: float, taxa: int) -> Any:
+        raise AudioIndisponivel("sem microfone")
+
+    monkeypatch.setattr(cli, "capturar", _capturar_com_falha)
+
+    cli._executar_conversa_voz(
+        FakeProvider([]),
+        Executor(RegistroFerramentas(), jail_paths=[]),
+        FakeSTTProvider([]),
+        FakeTTSProvider(),
+        6.0,
+        16000,
+    )
+
+    assert "sem microfone" in capsys.readouterr().out
+
+
+def test_executar_conversa_voz_mostra_erro_de_transcricao_e_continua(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal)
+
+    class SttComErro:
+        def transcrever(self, sinal: Any, taxa_amostragem: int) -> str:
+            raise ErroProvider("modelo indisponível")
+
+    cli._executar_conversa_voz(
+        FakeProvider([]),
+        Executor(RegistroFerramentas(), jail_paths=[]),
+        SttComErro(),
+        FakeTTSProvider(),
+        6.0,
+        16000,
+    )
+
+    assert "modelo indisponível" in capsys.readouterr().out
+
+
+def test_executar_conversa_voz_mostra_erro_de_reproducao_mas_nao_trava(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """M8/V4: uma saída de áudio indisponível não deve impedir o próximo turno de voz."""
+    monkeypatch.setattr(cli.console, "input", _entradas("", "sair"))
+    monkeypatch.setattr(cli, "capturar", lambda duracao, taxa: np.ones(1000, dtype=np.float32))
+    monkeypatch.setattr(cli, "aparar_silencio", lambda sinal, taxa: sinal)
+
+    def _tocar_com_falha(sinal: Any, taxa: int) -> None:
+        raise AudioIndisponivel("sem saída de áudio")
+
+    monkeypatch.setattr(cli, "tocar", _tocar_com_falha)
+
+    provider = FakeProvider(["olá!"])
+    stt = FakeSTTProvider(["oi"])
+
+    cli._executar_conversa_voz(
+        provider, Executor(RegistroFerramentas(), jail_paths=[]), stt, FakeTTSProvider(), 6.0, 16000
+    )
+
+    saida = capsys.readouterr().out
+    assert "olá!" in saida  # a resposta em texto sempre aparece, mesmo sem áudio
+    assert "sem saída de áudio" in saida
+
+
+def test_comando_voz_falar_recusa_quando_voz_desabilitada(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli, "carregar_configuracao", lambda: Configuracao(voz=ConfiguracaoVoz(habilitada=False))
+    )
+
+    cli._comando_voz_falar(argparse.Namespace())
+
+    assert "desabilitada" in capsys.readouterr().out
+
+
+def test_comando_voz_falar_monta_providers_e_inicia_loop_quando_habilitada(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli, "carregar_configuracao", lambda: Configuracao(voz=ConfiguracaoVoz(habilitada=True))
+    )
+    monkeypatch.setattr(
+        cli, "_construir_executor", lambda configuracao: (RegistroFerramentas(), None)
+    )
+    monkeypatch.setattr(
+        cli, "criar_provider_llm", lambda configuracao, prompt_sistema=None: FakeProvider([])
+    )
+    monkeypatch.setattr(cli, "criar_provider_stt", lambda configuracao: FakeSTTProvider([]))
+    monkeypatch.setattr(cli, "criar_provider_tts", lambda configuracao: FakeTTSProvider())
+
+    chamadas: list[Any] = []
+    monkeypatch.setattr(
+        cli, "_executar_conversa_voz", lambda *args: chamadas.append(args)
+    )
+
+    cli._comando_voz_falar(argparse.Namespace())
+
+    assert len(chamadas) == 1

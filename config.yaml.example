@@ -36,6 +36,7 @@ caminhos:
   banco_dados: ~/jarvis/dados/jarvis.db
   auditoria_jsonl: ~/jarvis/dados/auditoria.jsonl
   logs: ~/jarvis/dados/logs
+  modelos_voz: ~/jarvis/dados/modelos_voz  # modelo Piper baixado automaticamente aqui no 1o uso
 
 conhecimento:
   diretorios: []  # ex: ["~/Documentos"] — só o que estiver aqui pode ser indexado/consultado
@@ -43,8 +44,9 @@ conhecimento:
 voz:
   habilitada: false
   stt_modelo: small  # tamanho do modelo faster-whisper: tiny|base|small|medium|large-v3
-  dispositivo: auto  # auto = deixa o PortAudio/PipeWire escolher e fazer resample se preciso
+  dispositivo: auto  # só "auto" é suportado por enquanto (deixa PortAudio/PipeWire escolher)
   taxa_amostragem: 16000
   idioma: pt
   tts_voz: pt_BR-faber-medium
+  duracao_captura_segundos: 6.0  # janela fixa de gravação no "jarvis voz falar" (push-to-talk)
 

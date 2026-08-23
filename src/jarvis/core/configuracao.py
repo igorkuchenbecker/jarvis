@@ -43,11 +43,25 @@ class ConfiguracaoConhecimento:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoVoz:
+    habilitada: bool = False
+    stt_modelo: str = "small"
+    dispositivo: str = "auto"
+    taxa_amostragem: int = 16000
+    idioma: str = "pt"
+    tts_voz: str = "pt_BR-faber-medium"
+    duracao_captura_segundos: float = 6.0
+
+
+@dataclass(frozen=True)
 class ConfiguracaoCaminhos:
     workspace: Path = field(default_factory=lambda: RAIZ_JARVIS_PADRAO / "workspace")
     banco_dados: Path = field(default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "jarvis.db")
     auditoria_jsonl: Path = field(
         default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "auditoria.jsonl"
+    )
+    modelos_voz: Path = field(
+        default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "modelos_voz"
     )
 
 
@@ -60,6 +74,7 @@ class Configuracao:
     seguranca: ConfiguracaoSeguranca = field(default_factory=ConfiguracaoSeguranca)
     caminhos: ConfiguracaoCaminhos = field(default_factory=ConfiguracaoCaminhos)
     conhecimento: ConfiguracaoConhecimento = field(default_factory=ConfiguracaoConhecimento)
+    voz: ConfiguracaoVoz = field(default_factory=ConfiguracaoVoz)
 
 
 def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao:
@@ -74,11 +89,13 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     seguranca_bruta = bruto.get("seguranca") or {}
     caminhos_brutos = bruto.get("caminhos") or {}
     conhecimento_bruto = bruto.get("conhecimento") or {}
+    voz_bruta = bruto.get("voz") or {}
 
     padroes_caminhos = ConfiguracaoCaminhos()
     padroes_seguranca = ConfiguracaoSeguranca()
     padroes_limites = ConfiguracaoLimites()
     padroes_autonomia = ConfiguracaoAutonomia()
+    padroes_voz = ConfiguracaoVoz()
 
     return Configuracao(
         llm_padrao=provedor.get("llm_padrao", "claude_cli"),
@@ -115,10 +132,24 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             auditoria_jsonl=Path(
                 caminhos_brutos.get("auditoria_jsonl", str(padroes_caminhos.auditoria_jsonl))
             ).expanduser(),
+            modelos_voz=Path(
+                caminhos_brutos.get("modelos_voz", str(padroes_caminhos.modelos_voz))
+            ).expanduser(),
         ),
         conhecimento=ConfiguracaoConhecimento(
             diretorios=tuple(
                 Path(item).expanduser() for item in conhecimento_bruto.get("diretorios", [])
+            ),
+        ),
+        voz=ConfiguracaoVoz(
+            habilitada=voz_bruta.get("habilitada", padroes_voz.habilitada),
+            stt_modelo=voz_bruta.get("stt_modelo", padroes_voz.stt_modelo),
+            dispositivo=voz_bruta.get("dispositivo", padroes_voz.dispositivo),
+            taxa_amostragem=voz_bruta.get("taxa_amostragem", padroes_voz.taxa_amostragem),
+            idioma=voz_bruta.get("idioma", padroes_voz.idioma),
+            tts_voz=voz_bruta.get("tts_voz", padroes_voz.tts_voz),
+            duracao_captura_segundos=voz_bruta.get(
+                "duracao_captura_segundos", padroes_voz.duracao_captura_segundos
             ),
         ),
     )

@@ -14,6 +14,8 @@ from jarvis.core.objetivos import RepositorioObjetivos
 from jarvis.core.planejador import executar_objetivo
 from jarvis.io.audio import (
     AudioIndisponivel,
+    aparar_silencio,
+    capturar,
     dispositivo_entrada_padrao,
     dispositivo_padrao_do_sistema,
     dispositivo_saida_padrao,
@@ -23,7 +25,15 @@ from jarvis.io.audio import (
 )
 from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.observability.auditoria import RegistradorAuditoria
-from jarvis.providers import ErroProvider, LLMProvider, criar_provider_llm
+from jarvis.providers import (
+    ErroProvider,
+    LLMProvider,
+    STTProvider,
+    TTSProvider,
+    criar_provider_llm,
+    criar_provider_stt,
+    criar_provider_tts,
+)
 from jarvis.security.executor import Acao, Executor
 from jarvis.security.jail import ErroForaDoJail, resolver_dentro_do_jail
 from jarvis.tools import RegistroFerramentas, criar_registro_ferramentas_padrao
@@ -70,6 +80,11 @@ def _construir_analisador() -> argparse.ArgumentParser:
         "check", help="verifica microfone/saída de áudio e toca um beep de teste"
     )
     comando_voz_check.set_defaults(funcao=_comando_voz_check)
+
+    comando_voz_falar = subcomandos_voz.add_parser(
+        "falar", help="conversa por voz push-to-talk (ENTER para gravar, com ferramentas)"
+    )
+    comando_voz_falar.set_defaults(funcao=_comando_voz_falar)
 
     comando_audit = subcomandos.add_parser(
         "audit", help="lista as últimas ações registradas em auditoria"
@@ -176,6 +191,101 @@ def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) 
             continue
 
         console.print(f"[bold magenta]jarvis>[/bold magenta] {_seguro(resposta_final)}\n")
+
+
+def _executar_conversa_voz(
+    provider: LLMProvider,
+    executor: Executor,
+    stt: STTProvider,
+    tts: TTSProvider,
+    duracao_captura_segundos: float,
+    taxa_amostragem: int,
+) -> None:
+    """Loop de conversa por voz push-to-talk (M8/V3): mesmo `processar_turno` com ferramentas
+    usado pela conversa em texto (M2) — não é mais o LLM direto sem tool-calling cogitado
+    quando M1/M2 ainda não existiam (ver docs/DECISOES.md, decisão revisitada nesta fatia).
+    """
+    console.print(
+        "[bold cyan]JARVIS[/bold cyan] — modo voz (push-to-talk). "
+        "Pressione ENTER para falar, ou digite 'sair'+ENTER para encerrar.\n"
+    )
+
+    while True:
+        try:
+            entrada = console.input("[bold green]ENTER para falar>[/bold green] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+
+        if entrada in COMANDOS_DE_SAIDA:
+            break
+
+        console.print("[dim]🎙  gravando...[/dim]")
+        try:
+            sinal_capturado = capturar(duracao_captura_segundos, taxa_amostragem)
+        except AudioIndisponivel as erro:
+            console.print(f"[bold red]erro ao gravar:[/bold red] {erro}\n")
+            continue
+
+        sinal_aparado = aparar_silencio(sinal_capturado, taxa_amostragem)
+        if sinal_aparado.size == 0:
+            console.print("[yellow]não ouvi nada, tente de novo.[/yellow]\n")
+            continue
+
+        try:
+            texto_usuario = stt.transcrever(sinal_aparado, taxa_amostragem)
+        except ErroProvider as erro:
+            console.print(f"[bold red]erro ao transcrever:[/bold red] {erro}\n")
+            continue
+
+        console.print(f"[bold green]você (voz)>[/bold green] {_seguro(texto_usuario)}")
+
+        try:
+            turno = processar_turno(provider, executor, texto_usuario)
+        except ErroProvider as erro:
+            console.print(f"[bold red]erro:[/bold red] {erro}\n")
+            continue
+
+        for acao in turno.acoes_executadas:
+            console.print(f"[dim]→ executou {acao.ferramenta}({_seguro(acao.argumentos)})[/dim]")
+
+        console.print(f"[bold magenta]jarvis>[/bold magenta] {_seguro(turno.resposta_final)}")
+
+        try:
+            sinal_resposta, taxa_resposta = tts.sintetizar(turno.resposta_final)
+            tocar(sinal_resposta, taxa_resposta)
+        except (ErroProvider, AudioIndisponivel) as erro:
+            console.print(f"[bold red]erro ao falar a resposta:[/bold red] {erro}")
+
+        console.print()
+
+
+def _comando_voz_falar(argumentos: argparse.Namespace) -> None:
+    configuracao = carregar_configuracao()
+    if not configuracao.voz.habilitada:
+        console.print(
+            "[bold red]erro:[/bold red] voz desabilitada — ligue 'voz.habilitada: true' "
+            "em config.yaml"
+        )
+        return
+
+    registro, executor = _construir_executor(configuracao)
+    try:
+        provider = criar_provider_llm(configuracao, prompt_sistema=_montar_prompt_sistema(registro))
+        stt = criar_provider_stt(configuracao)
+        tts = criar_provider_tts(configuracao)
+    except ErroProvider as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+
+    _executar_conversa_voz(
+        provider,
+        executor,
+        stt,
+        tts,
+        configuracao.voz.duracao_captura_segundos,
+        configuracao.voz.taxa_amostragem,
+    )
 
 
 def _comando_voz_check(argumentos: argparse.Namespace) -> None:
