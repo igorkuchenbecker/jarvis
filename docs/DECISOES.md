@@ -551,3 +551,27 @@ numa janela genuinamente focada, e uma tecla de combinação (Ctrl+D) entregue e
 corretamente pelo TTY real. **Bug real encontrado no script de validação (não na ferramenta)**:
 Ctrl+D com uma linha de terminal pendente (sem Enter antes) só libera o buffer pro processo
 leitor, não sinaliza EOF de verdade — corrigido enviando Enter antes do Ctrl+D final.
+
+---
+
+## M10 — Integração 1.0
+
+**2026-08-23** | Versão do pacote bumped de `0.1.0` para `1.0.0`, e `jarvis --version` novo lê
+via `importlib.metadata.version("jarvis")` em vez de uma constante duplicada | Marcar de forma
+visível que o roadmap completo (M0-M10) fechou; ler a versão do metadata do pacote (fonte única,
+`pyproject.toml`) evita o de-sincronismo clássico de ter a versão hardcoded em dois lugares |
+Criar uma constante `__version__` em `jarvis/__init__.py` — rejeitada por ser mais um lugar pra
+lembrar de atualizar junto do `pyproject.toml`, quando `importlib.metadata` já resolve isso sem
+duplicação | Testado: `jarvis --version` imprime `jarvis 1.0.0` de verdade.
+
+**2026-08-23** | M10 não introduziu nenhuma ferramenta/capacidade nova — foi revisão e validação
+do projeto inteiro integrado, não uma fatia vertical isolada como M0-M9 | O próprio roteiro do
+projeto chama esse marco de "Integração 1.0", não de uma feature nova; toda a superfície de
+capacidades já estava construída ao fim do M9 | Inventar escopo novo pra M10 "parecer" um marco
+maior — rejeitada por contrariar a regra do projeto de fatias pequenas com motivo real, não
+trabalho por trabalho | Validação real de ponta a ponta feita: conversa real com o `claude` de
+verdade respondendo corretamente, e — mais importante — `computador.listar_janelas` habilitado
+via config e exercitado através de uma conversa real (o LLM decidiu sozinho chamar a ferramenta,
+o executor rodou, a resposta citou as janelas reais corretamente), provando que M9 se integra ao
+loop de conversa do M2 de verdade, não só que os módulos isolados passam em teste unitário —
+esse é o tipo de prova que "Integração 1.0" deveria de fato entregar.

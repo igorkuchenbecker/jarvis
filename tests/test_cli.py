@@ -143,6 +143,16 @@ def test_executar_conversa_mostra_erro_do_provider_e_continua(
     assert "falha simulada" in capsys.readouterr().out
 
 
+def test_version_imprime_versao_e_sai(capsys: pytest.CaptureFixture[str]) -> None:
+    analisador = cli._construir_analisador()
+
+    with pytest.raises(SystemExit) as excinfo:
+        analisador.parse_args(["--version"])
+
+    assert excinfo.value.code == 0
+    assert "jarvis" in capsys.readouterr().out
+
+
 def test_voz_check_roteia_para_o_comando_certo() -> None:
     analisador = cli._construir_analisador()
     argumentos = analisador.parse_args(["voz", "check"])

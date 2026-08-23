@@ -1,6 +1,6 @@
 [project]
 name = "jarvis"
-version = "0.1.0"
+version = "1.0.0"
 description = "Agente pessoal autônomo para Linux"
 requires-python = ">=3.14"
 dependencies = [

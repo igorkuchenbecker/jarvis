@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import version
 
 from rich.console import Console
 from rich.markup import escape
@@ -72,6 +73,9 @@ def principal() -> None:
 def _construir_analisador() -> argparse.ArgumentParser:
     analisador = argparse.ArgumentParser(prog="jarvis")
     analisador.set_defaults(funcao=_comando_padrao)
+    analisador.add_argument(
+        "--version", action="version", version=f"jarvis {version('jarvis')}"
+    )
     subcomandos = analisador.add_subparsers()
 
     comando_voz = subcomandos.add_parser("voz", help="comandos relacionados a voz")

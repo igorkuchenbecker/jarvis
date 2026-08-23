@@ -1,6 +1,6 @@
 # Estado do projeto JARVIS
 
-**Versão:** 0.1.0 (M0-M9 concluídos; M10 restante)
+**Versão:** 1.0.0 (M0-M10 concluídos — roadmap completo)
 **Última atualização:** 2026-08-23
 
 ## Feito
@@ -242,6 +242,25 @@
   lê o arquivo de volta e confere que o texto batido é exatamente o esperado. Passou de verdade,
   sem sujeira deixada no sistema (arquivo e janela removidos pelo próprio script).
 
+### M10 — Integração 1.0 (fecha o roadmap completo)
+- Revisão do projeto como um todo, não uma fatia isolada: `README.md` reescrito (comandos de
+  voz/computer use que faltavam, extras de instalação `voz`/`computador`, contagem de testes
+  atualizada), `pyproject.toml` na versão `1.0.0`.
+- `jarvis --version` (novo): lê a versão via `importlib.metadata`, uma única fonte de verdade
+  (`pyproject.toml`), sem duplicar a string em dois lugares.
+- **Testes de fumaça reais de ponta a ponta** (além dos testes automatizados por marco):
+  - `jarvis --help`/`jarvis voz --help`: todos os subcomandos aparecem corretamente.
+  - `jarvis` (conversa real com o `claude` de verdade): "qual é a capital do brasil?" →
+    "Brasília." — confirma toda a cadeia (config → provider → executor → loop → CLI) funcionando
+    junta, não só em isolamento.
+  - `computador.listar_janelas` ativado via config temporária e exercitado através de uma
+    conversa real (não só chamado direto em teste unitário): o LLM decidiu sozinho usar a
+    ferramenta, o executor rodou (READ_ONLY, sem aprovação necessária), a resposta final citou
+    as 3 janelas reais abertas corretamente, incluindo qual estava ativa. Prova que M9 se integra
+    de verdade ao loop de conversa do M2, não só que os módulos individuais funcionam sozinhos.
+- 187 testes (1 novo: `--version`).
+- Roadmap M0-M10 fechado por completo nesta sessão (2026-08-23), a pedido direto do usuário.
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com
@@ -306,12 +325,21 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 ## Próximo passo
 
-M0-M9 concluídos, todos em 2026-08-23 na mesma sessão, a pedido direto do usuário ("vamos
-terminar o Jarvis"). M9 (computer use: mouse/teclado via evdev, listagem de janelas via hyprctl,
-primeiro uso real de CRITICAL) validado na máquina real com um alvo descartável e seguro.
-Próximo e último: M10 (Integração 1.0) — momento de revisar o projeto como um todo (não uma
-fatia isolada): conferir que `jarvis` (conversa), `jarvis run` (goals), `jarvis voz falar`,
-`jarvis indexar`, `computador.*` (com `computador.habilitada: true`) funcionam juntos de forma
-coerente, revisar `README.md`/`config.yaml.example` estão com todas as seções documentadas,
-decidir se falta algum polimento de UX/CLI antes de considerar 1.0, e dar o resumo final do
-projeto inteiro.
+**Roadmap M0-M10 completo.** Todos os marcos concluídos em 2026-08-23, na mesma sessão, a pedido
+direto do usuário ("vamos terminar o Jarvis"). Não há próxima fatia planejada — o projeto está
+em modo de manutenção/uso a partir daqui.
+
+Não-objetivos que agora podem ser reavaliados (eram "até depois do M10", que já passou, mas
+NENHUM foi iniciado nesta sessão — decidir usar qualquer um deles é escolha do usuário, não
+decisão unilateral desta sessão): multi-agent/supervisor, robótica, IoT/edge, computação
+quântica, mobile, UI web pesada, fine-tuning.
+
+Dívida técnica conhecida que sobrevive ao 1.0 (nenhuma bloqueante, todas registradas com motivo
+acima e em DECISOES.md): `jarvis why` usa índice não-estável entre sessões; `autonomia`/`limites`
+do config ainda não são todos lidos; `AnthropicProvider`/`OpenAICompatProvider` não existem
+(só `claude_cli`); streaming não implementado; foco de janela por seletor não suportado;
+`digitar()` só ASCII sem acentos; STT roda em CPU por escolha deliberada, não limitação.
+
+Se uma sessão futura for retomar o projeto: ler este arquivo inteiro primeiro (fonte da verdade,
+não a memória de conversas passadas), rodar `scripts/check.sh` pra confirmar que ainda está
+verde, e só então decidir o que fazer — não há um "próximo passo" pré-definido esperando.

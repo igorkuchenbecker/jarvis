@@ -72,7 +72,11 @@ M0 Fundação (concluído) · M1 Core conversacional (concluído fora de ordem) 
 (concluído) · M3 Sistema + segurança plena (concluído) · M4 Loop autônomo + goals (concluído) ·
 M5 RAG leve local (concluído) · M6 Embeddings (avaliado, não adotado — ver abaixo) · M7 Visão
 (concluído) · M8 Voz (concluído, fora de ordem — ver abaixo) · M9 Computer use controlado
-(concluído — ver abaixo) · M10 Integração 1.0 (próximo e último).
+(concluído — ver abaixo) · M10 Integração 1.0 (concluído — ver abaixo).
+
+**Roadmap completo (M0-M10) fechado em 2026-08-23.** Projeto em modo de manutenção/uso a partir
+daqui — não há próxima fatia planejada. Ver `docs/PROJECT_STATE.md` seção "Próximo passo" para o
+que considerar se uma sessão futura for retomar o trabalho.
 
 Não-objetivos até depois do M10: multi-agent/supervisor, robótica, IoT/edge, computação
 quântica, mobile, UI web pesada, fine-tuning.
@@ -111,6 +115,14 @@ Foco de janela por seletor (não só listagem) ficou de fora — a API Lua desta
 não respondeu de forma confiável para isso em teste manual (só foco por direção funcionou de
 verdade). `digitar()` só suporta ASCII sem acentos (limitação real de evdev/XKB, não descuido).
 Ambos registrados como pendência conhecida em `docs/PROJECT_STATE.md`, não bloqueantes.
+
+## M10 — Integração 1.0 (concluído)
+
+Não introduziu ferramenta nova — foi revisão e validação do projeto inteiro integrado (versão
+`1.0.0`, `jarvis --version`, `README.md` atualizado). Validação real de ponta a ponta: conversa
+real com o `claude` respondendo corretamente, e `computador.listar_janelas` exercitado através de
+uma conversa real (o LLM decidiu sozinho chamar a ferramenta, não foi só teste unitário isolado)
+— prova que M9 se integra de verdade ao loop de conversa do M2.
 
 ## M1 — Core conversacional (concluído fora de ordem)
 
