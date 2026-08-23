@@ -24,6 +24,24 @@ implemente a lógica, sem mexer em empacotamento | Deixar o entry point para M1 
 adiaria uma decisão de estrutura que é barata de tomar agora | `jarvis` como comando funciona desde
 o M0, mas hoje só imprime uma mensagem de fundação.
 
+**2026-08-23** | Lição externa (projeto Moon Browser, fork do Firefox): publicar um clone git RASO
+(`--depth N`, histórico de terceiros + commits próprios) num repositório GitHub novo falhou 2x
+seguidas com `remote: fatal: did not receive expected object <hash>` / `index-pack failed`,
+sempre o mesmo hash — confirmado com `git cat-file -t <hash>` que o objeto genuinamente não existe
+no repo local (problema estrutural na cadeia de deltas do clone raso, não instabilidade de rede) |
+Relevante para qualquer ferramenta futura do jarvis que precise publicar/sincronizar um repositório
+git com histórico raso num remote novo (nenhuma ferramenta faz isso hoje) | Insistir tentando de
+novo do mesmo jeito — rejeitada, o erro é determinístico, não aleatório | Correção que funcionou:
+`git checkout --orphan <branch>`, commitar o estado atual da árvore como commit único (sem
+histórico), `git push origin <branch>:main --force`. Efeito colateral: o remote perde o histórico
+granular (aceitável/desejável quando o objetivo é só publicar o estado atual). Nota adicional:
+depois de um push assim (commit único gigante, ex. ~474 mil arquivos), os metadados derivados do
+GitHub (`size`, `/languages` da API) podem ficar zerados por muito mais tempo que o normal,
+independente de pushes seguintes (force ou não) — não confiar nesses campos como sinal de sucesso;
+usar a Contents API ou `git ls-remote` pra confirmar o conteúdo real. Detalhes completos:
+`second-brain/05-learnings/git-shallow-clone-push-to-new-remote-fails.md` e
+`github-stale-language-stats-large-push.md`.
+
 ---
 
 ## M8 — Voz
