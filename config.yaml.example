@@ -12,8 +12,10 @@ provedor:
     modelo: claude-sonnet-5
     max_tokens: 8192
   openai_compat:
-    base_url: http://localhost:11434/v1
+    base_url: http://localhost:11434/v1  # Ollama local; para API grátis troque por Groq/Gemini/OpenRouter
     modelo: llama3
+    api_key_env: ""  # nome da var de ambiente com a chave (ex: GROQ_API_KEY); vazio = sem auth (Ollama)
+    timeout_segundos: 120
 
 limites:
   max_iteracoes_por_objetivo: 12

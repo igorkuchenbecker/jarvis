@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from jarvis.core.configuracao import Configuracao
 from jarvis.providers.base import (
     ErroProvider,
@@ -11,6 +13,7 @@ from jarvis.providers.base import (
     VisionProvider,
 )
 from jarvis.providers.claude_cli import ClaudeCliProvider, ClaudeCliVisionProvider
+from jarvis.providers.openai_compat import OpenAICompatProvider
 from jarvis.providers.stt import WhisperSTTProvider
 from jarvis.providers.tts import PiperTTSProvider
 
@@ -19,6 +22,7 @@ __all__ = [
     "ClaudeCliVisionProvider",
     "ErroProvider",
     "LLMProvider",
+    "OpenAICompatProvider",
     "PiperTTSProvider",
     "STTProvider",
     "TTSProvider",
@@ -43,6 +47,30 @@ def criar_provider_llm(
         return ClaudeCliProvider(
             binario=configuracao.claude_cli.binario,
             timeout_segundos=configuracao.claude_cli.timeout_segundos,
+            prompt_sistema=prompt_sistema,
+        )
+    if configuracao.llm_padrao == "openai_compat":
+        ajustes = configuracao.openai_compat
+        api_key: str | None = None
+        if ajustes.api_key_env:
+            api_key = os.environ.get(ajustes.api_key_env)
+            if not api_key:
+                raise ErroProvider(
+                    f"variável de ambiente '{ajustes.api_key_env}' não definida — exporte a "
+                    "chave da API ou remova 'api_key_env' de provedor.openai_compat no config.yaml"
+                )
+        if prompt_sistema is None:
+            return OpenAICompatProvider(
+                base_url=ajustes.base_url,
+                modelo=ajustes.modelo,
+                timeout_segundos=ajustes.timeout_segundos,
+                api_key=api_key,
+            )
+        return OpenAICompatProvider(
+            base_url=ajustes.base_url,
+            modelo=ajustes.modelo,
+            timeout_segundos=ajustes.timeout_segundos,
+            api_key=api_key,
             prompt_sistema=prompt_sistema,
         )
     raise ErroProvider(f"provedor de LLM '{configuracao.llm_padrao}' ainda não é suportado")

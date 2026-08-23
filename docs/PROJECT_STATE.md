@@ -279,6 +279,27 @@
 - Versão bumped para `1.0.1` (correção/melhoria de UX, não funcionalidade nova de roadmap).
 - 190 testes no total.
 
+### Provider `openai_compat` (pós-roadmap, a pedido do usuário)
+- Motivação: eliminar o consumo de tokens Claude no uso diário — qualquer servidor com API
+  OpenAI-compat passa a servir o loop de ações (Ollama local a custo zero/offline, ou tiers
+  grátis tipo Groq/Gemini/OpenRouter via `api_key_env`).
+- `core/configuracao.py`: `ConfiguracaoOpenAiCompat` (base_url, modelo, api_key_env,
+  timeout_segundos), lida da seção `provedor.openai_compat`.
+- `providers/openai_compat.py`: `OpenAICompatProvider` (protocolo `LLMProvider`) — POST em
+  `{base_url}/chat/completions` via `urllib` stdlib (zero dependência nova), histórico da
+  conversa mantido client-side (APIs OpenAI-compat são stateless; `reiniciar()` limpa a lista),
+  mensagem cujo envio falhou sai do histórico pra retry recomeçar limpo. Erros de rede/HTTP/JSON
+  viram `ErroProvider` amigável; resposta sem `choices`/sem conteúdo também.
+- `providers/__init__.py::criar_provider_llm()`: aceita `llm_padrao: openai_compat`; chave de
+  API vem de variável de ambiente (nome configurado em `api_key_env`) — config.yaml nunca guarda
+  segredo; variável ausente = `ErroProvider` fail-closed.
+- 24 testes novos (`tests/test_providers_openai_compat.py` + seção nova em
+  `test_configuracao.py`): transporte falso injetado gravando chamadas (URL, corpo, headers),
+  histórico/reinício/system prompt/Authorization, falha sem sujar histórico, payloads maliciosos
+  de `_extrair_conteudo`, e a camada de rede real (`_postar_json`) exercitada com urllib
+  monkeypatchado (HTTPError/URLError/timeout/não-JSON). Zero rede nos testes.
+- Suíte completa: 211 testes verdes (`scripts/check.sh`).
+
 ## Bugs conhecidos
 
 - Nenhum bug aberto. No M7: faltava a flag `--verbose` (exigida pela CLI junto com
@@ -323,8 +344,8 @@ confirmada por um humano ao rodar `jarvis voz check`.
 - `config.yaml.example`: `autonomia` e `limites` ainda não têm código que os leia. `voz` agora É
   lido de verdade (resolvido no M8/V1-V4). `provedor.*`, `seguranca.jail_paths`, `caminhos.*` e
   `voz.*` já são lidos.
-- `AnthropicProvider`/`OpenAICompatProvider` não implementados; `criar_provider_llm()` só aceita
-  `llm_padrao: claude_cli` por enquanto (qualquer outro valor levanta `ErroProvider`).
+- `AnthropicProvider` não implementado; `criar_provider_llm()` aceita `claude_cli` e
+  `openai_compat` (qualquer outro valor levanta `ErroProvider`).
 - Streaming (`stream-json`) não implementado — `ClaudeCliProvider` usa `--output-format json`
   síncrono (decisão registrada, não é dívida bloqueante, só uma melhoria futura possível).
 - `voz.dispositivo` só suporta `"auto"` de verdade — mapear um valor específico para um índice de
@@ -354,8 +375,8 @@ quântica, mobile, UI web pesada, fine-tuning.
 
 Dívida técnica conhecida que sobrevive ao 1.0 (nenhuma bloqueante, todas registradas com motivo
 acima e em DECISOES.md): `jarvis why` usa índice não-estável entre sessões; `autonomia`/`limites`
-do config ainda não são todos lidos; `AnthropicProvider`/`OpenAICompatProvider` não existem
-(só `claude_cli`); streaming não implementado; foco de janela por seletor não suportado;
+do config ainda não são todos lidos; `AnthropicProvider` não existe (`claude_cli` e
+`openai_compat` cobertos); streaming não implementado; foco de janela por seletor não suportado;
 `digitar()` só ASCII sem acentos; STT roda em CPU por escolha deliberada, não limitação.
 
 Se uma sessão futura for retomar o projeto: ler este arquivo inteiro primeiro (fonte da verdade,

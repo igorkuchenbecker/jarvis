@@ -20,6 +20,14 @@ class ConfiguracaoClaudeCli:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoOpenAiCompat:
+    base_url: str = "http://localhost:11434/v1"
+    modelo: str = "llama3"
+    api_key_env: str = ""
+    timeout_segundos: int = 120
+
+
+@dataclass(frozen=True)
 class ConfiguracaoAutonomia:
     nivel: int = 2
 
@@ -74,6 +82,7 @@ class ConfiguracaoCaminhos:
 class Configuracao:
     llm_padrao: str = "claude_cli"
     claude_cli: ConfiguracaoClaudeCli = field(default_factory=ConfiguracaoClaudeCli)
+    openai_compat: ConfiguracaoOpenAiCompat = field(default_factory=ConfiguracaoOpenAiCompat)
     autonomia: ConfiguracaoAutonomia = field(default_factory=ConfiguracaoAutonomia)
     limites: ConfiguracaoLimites = field(default_factory=ConfiguracaoLimites)
     seguranca: ConfiguracaoSeguranca = field(default_factory=ConfiguracaoSeguranca)
@@ -90,6 +99,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     bruto: dict[str, Any] = yaml.safe_load(caminho.read_text(encoding="utf-8")) or {}
     provedor = bruto.get("provedor") or {}
     claude_cli_bruto = provedor.get("claude_cli") or {}
+    openai_compat_bruto = provedor.get("openai_compat") or {}
     autonomia_bruta = bruto.get("autonomia") or {}
     limites_brutos = bruto.get("limites") or {}
     seguranca_bruta = bruto.get("seguranca") or {}
@@ -110,6 +120,12 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
         claude_cli=ConfiguracaoClaudeCli(
             binario=claude_cli_bruto.get("binario", "claude"),
             timeout_segundos=claude_cli_bruto.get("timeout_segundos", 120),
+        ),
+        openai_compat=ConfiguracaoOpenAiCompat(
+            base_url=str(openai_compat_bruto.get("base_url", "http://localhost:11434/v1")),
+            modelo=str(openai_compat_bruto.get("modelo", "llama3")),
+            api_key_env=str(openai_compat_bruto.get("api_key_env", "")),
+            timeout_segundos=int(openai_compat_bruto.get("timeout_segundos", 120)),
         ),
         autonomia=ConfiguracaoAutonomia(
             nivel=autonomia_bruta.get("nivel", padroes_autonomia.nivel),

@@ -606,6 +606,8 @@ indicador_de_carregamento_por_mensagem`, `test_executar_conversa_indicador_desap
 resposta_aparecer`, `test_executar_conversa_voz_mostra_indicador_de_carregamento`) — sem isso,
 os testes passariam mesmo se o indicador fosse removido por engano, o que derrotaria o propósito.
 
+**2026-08-23** | Provider `OpenAICompatProvider` (pós-roadmap, a pedido do usuário para eliminar custo de tokens): HTTP via `urllib` stdlib, histórico da conversa mantido client-side em lista de mensagens, chave de API lida de variável de ambiente apontada por `api_key_env` | `httpx`/`requests` rejeitados — o projeto evita dependência nova e o urllib cobre POST JSON com timeout e erros tipados (`HTTPError`/`URLError`/`TimeoutError`) convertidos em `ErroProvider` amigável; histórico no servidor (estilo `--resume` do claude_cli) é impossível aqui porque APIs OpenAI-compat são stateless; chave escrita direto no config.yaml rejeitada por vazar segredo pro disco/git — o config guarda só o NOME da variável de ambiente | Mensagem cujo envio falhou é removida do histórico (`pop` no except) pra retry recomeçar limpo; sem `choices`/sem conteúdo textual levanta `ErroProvider` em vez de retornar string vazia pro loop de ações; protocolo de ações continua texto puro, então qualquer modelo OpenAI-compat participa do loop de ferramentas sem tool-calling nativo — Ollama local (custo zero, offline) ou tiers grátis (Groq/Gemini/OpenRouter)
+
 **2026-08-23** | Validado numa sessão real de terminal (não só com fakes) usando `script -qc
 ".venv/bin/jarvis" saida.log` (comando padrão do util-linux pra gravar uma sessão de pseudo-tty
 com todos os bytes/escapes ANSI, sem precisar de nenhuma ferramenta nova) | Rich só anima o
