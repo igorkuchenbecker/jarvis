@@ -22,7 +22,7 @@ Ferramentas disponíveis ao modelo: `fs.read/write/list`, `memory.store/search`,
 `sys.info`, `proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`,
 e — com `computador.habilitada: true` — `computador.listar_janelas/mover_mouse/clicar/digitar/tecla`.
 Com `gdap.habilitada: true`, ganha `gdap.status/listar_datasets/consultar/perguntar` (consulta o
-catálogo e o analista de IA do [GDAP](../gdap), projeto irmão de automação de dados) e
+catálogo e o analista de IA do [GDAP](https://github.com/igorkuchenbecker/gdap), projeto irmão de automação de dados) e
 `gdap.executar_pipeline` (roda um pipeline de dados já cadastrado, allowlist por nome).
 
 ## Segurança
@@ -69,7 +69,7 @@ outros programas, como KDE Connect; caso contrário, é necessário configurar i
 .venv/bin/pip install -e ".[dev,voz,computador]"
 ```
 
-Para usar o [GDAP](../gdap) (catálogo de dados, consultas, analista de IA, pipelines), rode o
+Para usar o [GDAP](https://github.com/igorkuchenbecker/gdap) (catálogo de dados, consultas, analista de IA, pipelines), rode o
 servidor dele (`gdap system serve`, ou o serviço systemd `--user` — ver `~/gdap/README.md`),
 gere uma chave (`gdap system key create jarvis --role engineer` — `analyst` não basta para
 pipelines que escrevem dados) e ligue em `config.yaml`:
@@ -88,7 +88,7 @@ Configuração opcional em `config.yaml` (modelo em `config.yaml.example`): auto
 jail de caminhos, allowlist, diretórios de conhecimento, voz e computador. Sem arquivo, roda com
 os padrões embutidos (tudo que é arriscado — voz, computer use — vem desligado por padrão).
 
-190 testes, todos offline (`FakeProvider`/mocks, zero rede — os `scripts/validar_*_real.py` são
+247 testes, todos offline (`FakeProvider`/mocks, zero rede — os `scripts/validar_*_real.py` são
 validação manual à parte, fora da suíte, que de fato baixam modelos/tocam hardware). Decisões
 técnicas registradas em `docs/DECISOES.md`; estado atual e dívida técnica em
 `docs/PROJECT_STATE.md`.
