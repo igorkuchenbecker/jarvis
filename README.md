@@ -21,6 +21,9 @@ Python 3.14 · SQLite + FTS5 · Rich · Claude Code como LLM (`claude -p`, sem c
 Ferramentas disponíveis ao modelo: `fs.read/write/list`, `memory.store/search`,
 `sys.info`, `proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`,
 e — com `computador.habilitada: true` — `computador.listar_janelas/mover_mouse/clicar/digitar/tecla`.
+Com `gdap.habilitada: true`, ganha `gdap.status/listar_datasets/consultar/perguntar` (consulta o
+catálogo e o analista de IA do [GDAP](../gdap), projeto irmão de automação de dados) e
+`gdap.executar_pipeline` (roda um pipeline de dados já cadastrado, allowlist por nome).
 
 ## Segurança
 
@@ -65,6 +68,21 @@ outros programas, como KDE Connect; caso contrário, é necessário configurar i
 ```sh
 .venv/bin/pip install -e ".[dev,voz,computador]"
 ```
+
+Para usar o [GDAP](../gdap) (catálogo de dados, consultas, analista de IA, pipelines), rode o
+servidor dele (`gdap system serve`, ou o serviço systemd `--user` — ver `~/gdap/README.md`),
+gere uma chave (`gdap system key create jarvis --role engineer` — `analyst` não basta para
+pipelines que escrevem dados) e ligue em `config.yaml`:
+
+```yaml
+gdap:
+  habilitada: true
+  base_url: http://127.0.0.1:8000
+  api_key_env: GDAP_API_KEY   # exporte a chave nessa variável, nunca no config.yaml
+  pipelines_permitidos: [nome_do_pipeline]
+```
+
+Zero dependência nova — o cliente usa `urllib` da stdlib, mesmo estilo do provider `openai_compat`.
 
 Configuração opcional em `config.yaml` (modelo em `config.yaml.example`): autonomia,
 jail de caminhos, allowlist, diretórios de conhecimento, voz e computador. Sem arquivo, roda com

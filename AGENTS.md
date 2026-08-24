@@ -205,6 +205,52 @@ percebido). A API de `criar_ferramentas_visao()` nem aceita mais um repositório
 decisão explícita registrada em `docs/DECISOES.md`. Se o usuário quiser lembrar de algo visto na
 tela, o LLM usa `memory.store` normalmente, por pedido explícito — nunca automático.
 
+## Pós-1.0 — Integração com GDAP (não é um marco novo do roadmap)
+
+GDAP (Global Data Automation Platform, projeto irmão em `~/gdap`) é uma plataforma de dados
+separada com seu próprio servidor HTTP, banco, RBAC e sandbox de SQL. O JARVIS ganhou 5
+ferramentas (`gdap.status`, `gdap.listar_datasets`, `gdap.consultar`, `gdap.perguntar`,
+`gdap.executar_pipeline`) que falam com ela só pela API HTTP — nunca importa o pacote gdap nem
+toca no banco dele, exatamente como qualquer outro cliente da API (a própria CLI/web UI do
+GDAP). `io/gdap.py` (transporte `urllib` stdlib, mesmo estilo de `providers/openai_compat.py`,
+zero dependência nova) + `tools/gdap.py` (schemas/riscos), atrás do gate
+`gdap.habilitada: false` por padrão (mesmo padrão de `computador.habilitada`).
+
+Quatro ferramentas são READ_ONLY: o próprio GDAP já bloqueia INSERT/UPDATE/DELETE/DDL por
+padrão no seu guard de SQL, então mesmo `gdap.consultar` com SQL arbitrário não altera dado
+nenhum — na pior hipótese o GDAP recusa e devolve erro. `gdap.executar_pipeline` é MEDIUM e só
+aceita nomes na allowlist `gdap.pipelines_permitidos` do config.yaml — mesma filosofia de
+`terminal.exec`/`allowlist_binarios`, verificada dentro da própria ferramenta porque o Executor
+não tem um mecanismo genérico de allowlist além de binário de terminal.
+
+**Bug real encontrado e corrigido no GDAP durante a validação na máquina** (não nos testes com
+fakes — mesma lição de sempre deste projeto): `gdap system key create <nome> --role X` reusava
+um usuário existente pelo e-mail sem sincronizar o papel armazenado, então reemitir uma chave
+com um papel maior para o mesmo nome era um no-op silencioso — a chave dizia ter o papel novo,
+mas o principal continuava restrito ao papel antigo. Só apareceu rodando
+`gdap.executar_pipeline` de verdade contra um servidor real (o pipeline falhava com "missing
+permission(s): dataset:write" mesmo com `--role engineer`). Corrigido no próprio GDAP (dois
+pontos: `cli/main.py::key_create` e `api/routers/system.py::create_api_key`), com teste de
+regressão provando os dois lados (falha sem a correção, passa com ela).
+
+**Validado na máquina real, ponta a ponta**, não só com fakes: servidor GDAP rodando como
+serviço systemd `--user` (`~/.config/systemd/user/gdap.service`, porta 8811 — a 8000 padrão já
+estava ocupada por outro processo nesta máquina), chave de API real emitida com papel
+`engineer` (papel `analyst` não basta — pipelines que ingerem/publicam dataset exigem
+`dataset:write`, só a partir de `engineer`), guardada como variável universal do fish
+(`GDAP_API_KEY`, mesmo padrão de `GROQ_API_KEY`). Uma conversa real via `processar_turno` com o
+provider Groq configurado do usuário decidiu sozinha chamar `gdap.status` +
+`gdap.listar_datasets` para responder "verifique se o GDAP está no ar e liste os datasets" — e
+outra decidiu chamar `gdap.perguntar` para responder "por que a receita caiu?", repassando a
+resposta do analista de IA do GDAP (com evidência e confiança) na resposta falada/escrita do
+JARVIS. `gdap.executar_pipeline` também validado de ponta a ponta contra um pipeline real,
+publicando uma nova versão de dataset e gerando relatórios de verdade.
+
+30 testes novos (`tests/test_io_gdap.py`, `tests/test_tools_gdap.py`) — transporte HTTP falso
+injetado (mesmo espírito de `test_providers_openai_compat.py`), camada de rede real exercitada
+com `urllib` monkeypatchado, e o teste "malicioso" da convenção do projeto provando que um
+pipeline fora da allowlist é recusado sem sequer chamar o GDAP. Versão `1.2.0`.
+
 ## Pós-1.0 — Indicador de carregamento (não é um marco novo do roadmap)
 
 `with console.status("[dim]pensando...[/dim]", spinner="dots"):` (Rich, já dependência) envolve

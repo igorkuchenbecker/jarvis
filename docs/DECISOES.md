@@ -638,3 +638,54 @@ só quando `ferramenta.risco == NivelRisco.READ_ONLY`, senão continua só `jail
 (não só fake) contra o `config.yaml` de produção: `fs.read` em `/home/igor/.bashrc` (fora do
 jail de escrita) teve sucesso; `fs.write` em `/home/igor/arquivo-novo.txt` foi recusado com
 "fora dos diretórios autorizados", confirmando que a ampliação é estritamente só-leitura.
+
+**2026-08-24** | Integração com GDAP (projeto irmão de automação/análise de dados em ~/gdap)
+feita só pela API HTTP dele (`io/gdap.py` + `tools/gdap.py`), nunca importando o pacote gdap
+nem tocando no banco dele diretamente | GDAP já é "API-first" por desenho (CLI e web UI dele
+são clientes da mesma API pública) — importar o pacote Python significaria arrastar a árvore de
+dependências inteira dele (polars, duckdb, fastapi, ~20 libs) para dentro de um projeto que
+evita deliberadamente dependência nova, além de acoplar as duas venvs/versões de Python
+(JARVIS em 3.14, GDAP em 3.13) e todo o ciclo de vida de release de um projeto ao do outro | (a)
+importar `gdap` como dependência Python direta — rejeitada pelos motivos acima; (b) rodar
+pipelines do GDAP via `terminal.exec` chamando o binário `gdap` da CLI dele — rejeitada por ser
+mais frágil (parsing de stdout em vez de JSON estruturado) e por não se beneficiar do controle
+de acesso/RBAC da API | `io/gdap.py::ClienteGdap` usa `urllib` stdlib (zero dependência nova,
+mesmo estilo de `providers/openai_compat.py`), transporte injetável para testes sem rede. 4 das
+5 ferramentas são READ_ONLY porque o GDAP já bloqueia escrita/DDL no próprio guard de SQL
+(defesa em profundidade: confirmado na validação real que um `UPDATE` via `gdap.consultar`
+continua bloqueado mesmo com uma chave de papel `engineer`, porque o servidor GDAP mantém
+`security.sql_write_enabled: false` por padrão, independente do papel do principal).
+`gdap.executar_pipeline` (MEDIUM) usa uma allowlist de nomes verificada dentro da própria
+ferramenta (`gdap.pipelines_permitidos` no config.yaml) em vez de estender o mecanismo de
+allowlist do `Executor` (hoje só cobre binário de terminal) — mudar o `Executor` para um
+mecanismo genérico de allowlist por-ferramenta foi cogitado e descartado por afetar todo o
+projeto para resolver um caso só, quando a validação dentro da própria função de execução já
+resolve com o mesmo nível de segurança (a chamada ao GDAP simplesmente nunca acontece se o nome
+não estiver na lista).
+
+**2026-08-24** | Bug real encontrado e corrigido NO PRÓPRIO GDAP durante a validação manual
+desta integração (não nos testes com fakes): `gdap system key create <nome> --role X` reusava
+um usuário existente pelo e-mail sem sincronizar o campo `role` armazenado nele | Validando
+`gdap.executar_pipeline` de verdade contra um servidor GDAP real: a chave emitida com
+`--role engineer` continuava incapaz de rodar um pipeline que ingere/publica dataset (erro real
+do servidor: "missing permission(s): dataset:write"). Causa raiz: o principal HTTP do GDAP
+calcula suas permissões como a INTERSECÇÃO entre as permissões do papel do *usuário* armazenado
+e os `scopes` da chave (`scopes` só pode restringir, nunca ampliar — desenho de segurança
+correto do GDAP) — mas como o usuário "jarvis" já existia com papel `analyst` da primeira
+emissão, reemitir com `--role engineer` só atualizava os `scopes` da CHAVE nova, nunca o `role`
+do usuário reusado, então a intersecção continuava presa ao teto antigo (`analyst`) |
+Corrigido em dois pontos do GDAP (`cli/main.py::key_create` e
+`api/routers/system.py::create_api_key`): ao reusar um usuário existente, sincronizar
+`user.role` para o papel recém-pedido. No endpoint HTTP, essa sincronização é
+DELIBERADAMENTE pulada quando o usuário reusado é o PRÓPRIO chamador autenticado
+(`user.id == context.principal.user_id`) — sem essa exceção, um admin pedindo uma chave mais
+restrita PARA SI MESMO (uso self-service já suportado pelo endpoint, quando `user_email` não é
+informado) rebaixaria silenciosamente o papel da própria conta admin como efeito colateral,
+descoberto no primeiro teste de regressão escrito para este fix (o teste inicial, sem
+`user_email` explícito, "vazava" para a conta do chamador e o segundo `POST` de admin passava a
+retornar 403) | Teste de regressão em `~/gdap/tests/integration/test_api.py` (não no JARVIS —
+o bug é do GDAP) prova os dois lados: reemitir uma chave nomeada com papel maior passa a
+funcionar de ponta a ponta (cria fonte + ingere dado, que exige `dataset:write`), e uma
+sanity-check manual confirmou que desfazer a correção faz o mesmo teste falhar com o erro real
+("missing permission(s): source:write"). Suíte completa do GDAP (159 testes) verde depois da
+correção; nenhuma outra permissão/rota afetada.

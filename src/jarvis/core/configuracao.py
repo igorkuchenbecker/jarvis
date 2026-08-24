@@ -60,6 +60,27 @@ class ConfiguracaoComputador:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoGdap:
+    """GDAP (Global Data Automation Platform) é um projeto irmão em ~/gdap, rodando como
+    servidor HTTP separado (`gdap system serve`). O JARVIS fala com ele só pela API HTTP dele
+    -- nunca importa o pacote gdap nem toca no banco dele diretamente --, do mesmo jeito que
+    qualquer outro cliente da API (a própria CLI/web UI do GDAP). Ver `io/gdap.py`.
+    """
+
+    habilitada: bool = False
+    base_url: str = "http://127.0.0.1:8000"
+    # Nome da variável de ambiente com a API key do GDAP (`gdap system key create jarvis
+    # --role analyst`). Igual a openai_compat.api_key_env: o config.yaml nunca guarda o segredo
+    # em si, só o nome da variável.
+    api_key_env: str = ""
+    timeout_segundos: int = 30
+    # Só pipelines nesta lista podem ser rodados por gdap.executar_pipeline (MEDIUM) -- mesma
+    # filosofia de seguranca.allowlist_binarios para terminal.exec, adaptada porque o Executor
+    # não tem um mecanismo genérico de allowlist além de binário de terminal (ver DECISOES.md).
+    pipelines_permitidos: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class ConfiguracaoVoz:
     habilitada: bool = False
     stt_modelo: str = "small"
@@ -77,9 +98,7 @@ class ConfiguracaoCaminhos:
     auditoria_jsonl: Path = field(
         default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "auditoria.jsonl"
     )
-    modelos_voz: Path = field(
-        default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "modelos_voz"
-    )
+    modelos_voz: Path = field(default_factory=lambda: RAIZ_JARVIS_PADRAO / "dados" / "modelos_voz")
 
 
 @dataclass(frozen=True)
@@ -94,6 +113,7 @@ class Configuracao:
     conhecimento: ConfiguracaoConhecimento = field(default_factory=ConfiguracaoConhecimento)
     voz: ConfiguracaoVoz = field(default_factory=ConfiguracaoVoz)
     computador: ConfiguracaoComputador = field(default_factory=ConfiguracaoComputador)
+    gdap: ConfiguracaoGdap = field(default_factory=ConfiguracaoGdap)
 
 
 def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao:
@@ -111,6 +131,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     conhecimento_bruto = bruto.get("conhecimento") or {}
     voz_bruta = bruto.get("voz") or {}
     computador_bruto = bruto.get("computador") or {}
+    gdap_bruto = bruto.get("gdap") or {}
 
     padroes_caminhos = ConfiguracaoCaminhos()
     padroes_seguranca = ConfiguracaoSeguranca()
@@ -118,6 +139,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     padroes_autonomia = ConfiguracaoAutonomia()
     padroes_voz = ConfiguracaoVoz()
     padroes_computador = ConfiguracaoComputador()
+    padroes_gdap = ConfiguracaoGdap()
 
     return Configuracao(
         llm_padrao=provedor.get("llm_padrao", "claude_cli"),
@@ -188,5 +210,14 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
         ),
         computador=ConfiguracaoComputador(
             habilitada=computador_bruto.get("habilitada", padroes_computador.habilitada),
+        ),
+        gdap=ConfiguracaoGdap(
+            habilitada=gdap_bruto.get("habilitada", padroes_gdap.habilitada),
+            base_url=str(gdap_bruto.get("base_url", padroes_gdap.base_url)),
+            api_key_env=str(gdap_bruto.get("api_key_env", padroes_gdap.api_key_env)),
+            timeout_segundos=int(gdap_bruto.get("timeout_segundos", padroes_gdap.timeout_segundos)),
+            pipelines_permitidos=tuple(
+                gdap_bruto.get("pipelines_permitidos", list(padroes_gdap.pipelines_permitidos))
+            ),
         ),
     )

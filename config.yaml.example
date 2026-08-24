@@ -52,6 +52,19 @@ computador:
   habilitada: false  # liga as ferramentas computador.* (mouse/teclado/janelas, M9)
   # CRITICAL: clicar/digitar/tecla sempre pedem aprovacao interativa, mesmo com isso ligado.
 
+gdap:
+  habilitada: false  # liga as ferramentas gdap.* (catálogo/consulta/IA/pipelines do GDAP)
+  base_url: http://127.0.0.1:8000  # onde `gdap system serve` está rodando (projeto ~/gdap)
+  api_key_env: ""  # nome da var de ambiente com a API key (ex: GDAP_API_KEY); vazio = sem auth
+  # gerar a chave com: gdap system key create jarvis --role engineer  (papel "analyst" NÃO
+  # basta: pipelines que ingerem/publicam dataset (read.source/write.dataset) exigem a
+  # permissão dataset:write, que só entra a partir de "engineer" -- achado validando isto na
+  # máquina real, não só com fakes; ver docs/DECISOES.md). "engineer" também libera sql:write,
+  # mas o próprio GDAP mantém isso desligado por padrão no servidor
+  # (security.sql_write_enabled: false), então gdap.consultar continua só-leitura na prática.
+  timeout_segundos: 30
+  pipelines_permitidos: []  # só nomes aqui podem ser rodados por gdap.executar_pipeline (MEDIUM)
+
 voz:
   habilitada: false
   stt_modelo: small  # tamanho do modelo faster-whisper: tiny|base|small|medium|large-v3
