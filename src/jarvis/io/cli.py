@@ -17,6 +17,7 @@ from jarvis.core.loop import (
 )
 from jarvis.core.objetivos import RepositorioObjetivos
 from jarvis.core.planejador import executar_objetivo
+from jarvis.io import agendador as agendar
 from jarvis.io.audio import (
     AudioIndisponivel,
     aparar_silencio,
@@ -122,6 +123,46 @@ def _construir_analisador() -> argparse.ArgumentParser:
     )
     comando_indexar.add_argument("diretorio", type=str)
     comando_indexar.set_defaults(funcao=_comando_indexar)
+
+    comando_agendar = subcomandos.add_parser(
+        "agendar",
+        help="tarefas periódicas via systemd user timers (add|listar|remover|testar)",
+    )
+    subcomandos_agendar = comando_agendar.add_subparsers(required=True)
+    comando_agendar_add = subcomandos_agendar.add_parser(
+        "add", help="cria uma tarefa que roda `jarvis run <objetivo>` no horário marcado"
+    )
+    comando_agendar_add.add_argument("--nome", required=True)
+    comando_agendar_add.add_argument("--objetivo", required=True)
+    grupo_quando = comando_agendar_add.add_mutually_exclusive_group(required=True)
+    grupo_quando.add_argument("--diarias", metavar="HH:MM", help="todos os dias no horário")
+    grupo_quando.add_argument(
+        "--a-cada", metavar="MINUTOS", type=int, help="a cada N minutos"
+    )
+    grupo_quando.add_argument(
+        "--quando", metavar="ONCALENDAR", help="expressão OnCalendar do systemd (avançado)"
+    )
+    comando_agendar_add.add_argument(
+        "--sobrescrever", action="store_true", help="substitui tarefa com o mesmo nome"
+    )
+    comando_agendar_add.set_defaults(funcao=_comando_agendar_add)
+
+    comando_agendar_listar = subcomandos_agendar.add_parser(
+        "listar", help="lista as tarefas agendadas"
+    )
+    comando_agendar_listar.set_defaults(funcao=_comando_agendar_listar)
+
+    comando_agendar_remover = subcomandos_agendar.add_parser(
+        "remover", help="remove uma tarefa pelo nome"
+    )
+    comando_agendar_remover.add_argument("nome", type=str)
+    comando_agendar_remover.set_defaults(funcao=_comando_agendar_remover)
+
+    comando_agendar_testar = subcomandos_agendar.add_parser(
+        "testar", help="dispara a tarefa agora (systemctl --user start)"
+    )
+    comando_agendar_testar.add_argument("nome", type=str)
+    comando_agendar_testar.set_defaults(funcao=_comando_agendar_testar)
 
     return analisador
 
@@ -465,6 +506,53 @@ def _comando_why(argumentos: argparse.Namespace) -> None:
     console.print(f"resultado: {_seguro(registro.resultado)}")
     console.print(f"duração: {registro.duracao_segundos:.3f}s")
     console.print(f"custo estimado: US${registro.custo_estimado_usd:.4f}")
+
+
+def _comando_agendar_add(argumentos: argparse.Namespace) -> None:
+    try:
+        timer = agendar.criar_tarefa(
+            argumentos.nome,
+            argumentos.objetivo,
+            diarias=argumentos.diarias,
+            a_cada=argumentos.a_cada,
+            quando=argumentos.quando,
+            sobrescrever=argumentos.sobrescrever,
+        )
+    except agendar.ErroAgendador as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+    console.print(
+        f"[bold green]tarefa agendada.[/bold green] timer: {timer.name} — "
+        f"`jarvis agendar testar {argumentos.nome}` roda agora"
+    )
+
+
+def _comando_agendar_listar(argumentos: argparse.Namespace) -> None:
+    nomes = agendar.listar_tarefas()
+    if not nomes:
+        console.print("[dim]nenhuma tarefa agendada.[/dim]")
+        return
+    console.print("[bold]Tarefas agendadas:[/bold]")
+    for nome in nomes:
+        console.print(f"  - {nome}")
+
+
+def _comando_agendar_remover(argumentos: argparse.Namespace) -> None:
+    try:
+        agendar.remover_tarefa(argumentos.nome)
+    except agendar.ErroAgendador as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+    console.print(f"[bold green]tarefa removida:[/bold green] {argumentos.nome}")
+
+
+def _comando_agendar_testar(argumentos: argparse.Namespace) -> None:
+    try:
+        agendar.testar_tarefa(argumentos.nome)
+    except agendar.ErroAgendador as erro:
+        console.print(f"[bold red]erro:[/bold red] {erro}")
+        return
+    console.print(f"[bold green]tarefa disparada:[/bold green] {argumentos.nome}")
 
 
 if __name__ == "__main__":

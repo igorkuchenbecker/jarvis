@@ -244,6 +244,7 @@ def test_fabrica_recusa_quando_variavel_de_api_key_nao_existe(
     from jarvis.tools import criar_registro_ferramentas_padrao
 
     monkeypatch.delenv("JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE", raising=False)
+    monkeypatch.setattr("jarvis.tools._processo_interativo", lambda: True)
     configuracao = Configuracao(
         caminhos=Configuracao().caminhos.__class__(banco_dados=tmp_path / "jarvis.db"),
         gdap=ConfiguracaoGdap(habilitada=True, api_key_env="JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE"),
@@ -251,3 +252,23 @@ def test_fabrica_recusa_quando_variavel_de_api_key_nao_existe(
 
     with pytest.raises(ErroProvider, match="JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE"):
         criar_registro_ferramentas_padrao(configuracao)
+
+
+def test_fabrica_degrada_em_processo_nao_interativo(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from jarvis.core.configuracao import Configuracao, ConfiguracaoGdap
+    from jarvis.tools import criar_registro_ferramentas_padrao
+
+    monkeypatch.delenv("JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE", raising=False)
+    monkeypatch.setattr("jarvis.tools._processo_interativo", lambda: False)
+    configuracao = Configuracao(
+        caminhos=Configuracao().caminhos.__class__(banco_dados=tmp_path / "jarvis.db"),
+        gdap=ConfiguracaoGdap(habilitada=True, api_key_env="JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE"),
+    )
+
+    registro = criar_registro_ferramentas_padrao(configuracao)
+
+    nomes = [f.nome for f in registro.todas()]
+    assert not any(nome.startswith("gdap.") for nome in nomes)
+    assert "JARVIS_TESTE_GDAP_CHAVE_INEXISTENTE" in capsys.readouterr().err

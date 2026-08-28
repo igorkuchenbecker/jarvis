@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from jarvis.core.configuracao import Configuracao
 from jarvis.io.gdap import ClienteGdap
@@ -72,17 +73,33 @@ def criar_registro_ferramentas_padrao(configuracao: Configuracao) -> RegistroFer
         ajustes_gdap = configuracao.gdap
         api_key = os.environ.get(ajustes_gdap.api_key_env) if ajustes_gdap.api_key_env else None
         if ajustes_gdap.api_key_env and not api_key:
-            raise ErroProvider(
-                f"variável de ambiente '{ajustes_gdap.api_key_env}' não definida — exporte a "
-                "API key do GDAP ('gdap system key create jarvis --role engineer') ou remova "
-                "'api_key_env' de gdap no config.yaml"
+            if _processo_interativo():
+                raise ErroProvider(
+                    f"variável de ambiente '{ajustes_gdap.api_key_env}' não definida — exporte a "
+                    "API key do GDAP ('gdap system key create jarvis --role engineer') ou remova "
+                    "'api_key_env' de gdap no config.yaml"
+                )
+            print(
+                f"aviso: '{ajustes_gdap.api_key_env}' não definida — ferramentas do GDAP "
+                "desativadas neste processo",
+                file=sys.stderr,
             )
-        cliente_gdap = ClienteGdap(
-            base_url=ajustes_gdap.base_url,
-            api_key=api_key,
-            timeout_segundos=ajustes_gdap.timeout_segundos,
-        )
-        for ferramenta in criar_ferramentas_gdap(cliente_gdap, ajustes_gdap.pipelines_permitidos):
-            registro.registrar(ferramenta)
+        else:
+            cliente_gdap = ClienteGdap(
+                base_url=ajustes_gdap.base_url,
+                api_key=api_key,
+                timeout_segundos=ajustes_gdap.timeout_segundos,
+            )
+            for ferramenta in criar_ferramentas_gdap(
+                cliente_gdap, ajustes_gdap.pipelines_permitidos
+            ):
+                registro.registrar(ferramenta)
 
     return registro
+
+
+def _processo_interativo() -> bool:
+    try:
+        return sys.stdin.isatty()
+    except Exception:
+        return False

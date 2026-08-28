@@ -816,3 +816,34 @@ ganhou reforço explícito ("use 'tipo', 'ferramenta' e 'argumentos' — nunca '
 'parameters'"), mas o parse tolerante é a defesa real. Tests parametrizados para os 3 formatos
 nativos + garantia de que JSON de texto normal não vira ação. Suíte 293 passed, ruff + mypy --strict
 limpos. Versão `1.4.0` (continua).
+
+**2026-08-28** | Série de 9 melhorias aprovadas pelo usuário, uma por vez (1 concluída → seguir =
+próxima): (1) `scripts/benchmark_aderencia.py` — critério de acerto aceitando conjunto de
+ferramentas `{"conhecimento.buscar","pesquisar"}` (12/12 canônico com qwen3:4b) | (2) retry de
+formato inválido no `processar_turno` (`max_reparos`=2, corrige JSON truncado/drift no turno, não
+vira resposta final) | (3) `piso_max_tokens_raciocinio` (16384) para famílias com campo
+`reasoning` (qwen3/qwq/deepseek-r1/gpt-oss/kimi/glm-4.5/gemini-2.5) garantirem `content` por
+inteiro | (4) `ConfiguracaoLimites` agora é lido de verdade do config.yaml
+(`max_iteracoes_por_turno`=12, `max_reparos_por_turno`=2, `max_replanejamentos`=3,
+`timeout_por_passo_segundos`=60); config.yaml.example sincronizado | (5) compressão de histórico
+no `openai_compat` (`historico_teto_tokens`=3000, 0 desliga; resumo via LLM das antigas, mantém as
+2 últimas; falha do resumo → não comprime) | (6) citação `[arquivo § seção]` passa a mostrar o
+caminho real (`expanduser().resolve()` na ingestão; `~/...` se dentro do home), então `fs.read`
+consegue abrir o trecho citado de fato — fecha a limitação registrada na seção da busca web.
+
+**2026-08-28** | Agendador via systemd user timers (`jarvis agendar`, `io/agendador.py`) —
+cada tarefa vira `.service` (oneshot, roda `jarvis run "<objetivo>"`) + `.timer` sob o prefixo
+`jarvis_tarefa_<slug>`, com `systemctl` injetável nos testes | Alternativas: (a) `at`/`cron` do
+sistema (rejeitado: exige senha/sudo, não anda com systemd do usuário e foge do espírito
+"config em $HOME"); (b) agendador interno com thread do Python (rejeitado: morre quando o processo
+morre — timers do systemd sobrevivem e disparam independentemente do JARVIS estar aberto) |
+Regra de segurança: o timer roda sem TTY, então HIGH/CRITICAL falham fechados — objetivos só
+mutadores só concluem em execução interativa; READ_ONLY concluem sozinhos | Ajuste encontrado na
+validação REAL (mesma lição de sempre): timers rodam no ambiente do systemd, sem as variáveis
+universais do fish → `GDAP_API_KEY` faltando quebrava o startup antes de qualquer LLM. Decidido:
+`tools/__init__.py` degrada em processo não-interativo (stderr + omite `gdap.*`); interativo
+continua erro explícito. Suíte 318 passed. Versão `1.4.0` (continua).
+
+**Pendências das 9 melhorias (28/08):** (7) agendador — CONCLUÍDO acima; (8) `jarvis why` com
+índice estável entre sessões; (9) foco de janela por seletor no Hyprland. A ordem é fixa — cada
+uma só começa com o "Seguir" do usuário na sessão anterior.

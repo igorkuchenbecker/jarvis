@@ -275,3 +275,16 @@ código em autonomia 2); `auto.editar` confina caminhos à raiz do repo internam
 relativos resolvem da raiz; recusa qualquer coisa fora dela e dentro de `.git`) com rollback.
 Sem push automático — publicar no GitHub é decisão do usuário. 19 testes em
 `tests/test_tools_autor.py`; suíte 289 passed. Versão `1.4.0`.
+
+## Pós-1.0 — Agendador (não é um marco novo do roadmap)
+
+`jarvis agendar` (add|listar|remover|testar) agenda tarefas periódicas via **systemd user
+timers**: cada tarefa vira um par `.service` (oneshot, `ExecStart` = `jarvis run "<objetivo>"`,
+auto-resolvido para o binário `jarvis` ou `python -m jarvis.io.cli`) + `.timer` em
+`~/.config/systemd/user/`, prefixo `jarvis_tarefa_<slug>`. Agenda por `--diarias HH:MM`,
+`--a-cada N` minutos ou `--quando <OnCalendar>`; `--sobrescrever` substitui o mesmo nome.
+Regra de segurança: o timer roda sem TTY → toda aprovação HIGH/CRITICAL falha fechada; só
+objetivos READ_ONLY concluem automaticamente. `systemctl` é injetável nos testes
+(`SistemaSystemctl: Callable[[list[str]], str]`). Detalhe herdado da validação real: processos
+sem TTY e sem `GDAP_API_KEY` degradam (stderr + sem ferramentas `gdap.*`) em vez de quebar o
+startup. 12 testes em `tests/test_agendar.py`; suíte 318 passed. Versão `1.4.0`.

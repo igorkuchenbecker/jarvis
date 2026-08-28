@@ -609,6 +609,32 @@ passed.
 pacote novos só são lidos/carregados na inicialização). Visão (M7) segue dependente do
 `ClaudeCliVisionProvider` — não coberta pelo Ollama local.
 
+## Pós-1.0 — Agendador (systemd user timers, a pedido do usuário)
+
+`io/agendador.py` + subcomando `jarvis agendar` (add|listar|remover|testar). Cada tarefa vira um
+par `.service`+`.timer` em `~/.config/systemd/user/` sob o prefixo `jarvis_tarefa_<slug>`, ativado
+com `systemctl --user enable --now`; o `.service` é `Type=oneshot` e roda `jarvis run "<objetivo>"`
+(ExecStart que se resolve sozinho para o binário `jarvis` ou `sys.executable -m jarvis.io.cli`),
+reusando o loop do M4 (plano/subtarefas/auto-resume) com retomada pós-crash. Agenda por
+`--diarias HH:MM`, `--a-cada N` (minutos) ou `--quando <OnCalendar>`; `--sobrescrever` substitui
+o mesmo nome; `testar` dispara na hora (`systemctl --user start`). Sem gate de config — a
+expressão de tempo vai direto para o OnCalendar da unit. `systemctl` é injetável
+(`SistemaSystemctl: Callable[[list[str]], str]`) para os testes rodarem sem tocar o da máquina.
+
+Regra de segurança herdada: o timer executa em ambiente sem TTY (entrada é `/dev/null`), então
+aprovações HIGH/CRITICAL nunca são possíveis — fail-closed por natureza; só objetivos READ_ONLY
+têm garantia de conclusão automática. Validado de ponta a ponta na máquina: `agendar add` criou
+as units + timer ativo, `listar` mostrou, `testar` subiu o serviço e o objetivo (qwen3:4b local)
+concluiu em ~33s, `remover` desativou e apagou tudo (`systemctl --user list-timers` limpo).
+
+Ajuste encontrado na validação: timers rodam fora do ambiente do fish, então a variável universal
+`GDAP_API_KEY` não chega ao processo. O registro das ferramentas (`tools/__init__.py`) agora
+degrada em vez de quebrar o startup: processo sem TTY + env faltando → imprime aviso no stderr e
+omite as ferramentas `gdap.*`; interativamente o erro explícito continua (feedback imediato).
+Testes: 12 novos em `tests/test_agendar.py` (units, OnCalendar, slug, sobrescrever, listar,
+remover, disparar, diárias/intervalos inválidos) + 1 em `tests/test_io_gdap.py` (degradação sem
+TTY). Suíte 318 passed.
+
 ## Próximo passo
 
 **Roadmap M0-M10 completo.** Todos os marcos concluídos em 2026-08-23, na mesma sessão, a pedido
@@ -621,10 +647,10 @@ decisão unilateral desta sessão): multi-agent/supervisor, robótica, IoT/edge,
 quântica, mobile, UI web pesada, fine-tuning.
 
 Dívida técnica conhecida que sobrevive ao 1.0 (nenhuma bloqueante, todas registradas com motivo
-acima e em DECISOES.md): `jarvis why` usa índice não-estável entre sessões; `autonomia`/`limites`
-do config ainda não são todos lidos; `AnthropicProvider` não existe (`claude_cli` e
-`openai_compat` cobertos); streaming não implementado; foco de janela por seletor não suportado;
-`digitar()` só ASCII sem acentos; STT roda em CPU por escolha deliberada, não limitação.
+acima e em DECISOES.md): `jarvis why` usa índice não-estável entre sessões; `AnthropicProvider`
+não existe (`claude_cli` e `openai_compat` cobertos); streaming não implementado; foco de janela
+por seletor não suportado; `digitar()` só ASCII sem acentos; STT roda em CPU por escolha
+deliberada, não limitação.
 
 Se uma sessão futura for retomar o projeto: ler este arquivo inteiro primeiro (fonte da verdade,
 não a memória de conversas passadas), rodar `scripts/check.sh` pra confirmar que ainda está
