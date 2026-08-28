@@ -69,9 +69,10 @@ def _extrair_conteudo(resposta: dict[str, Any]) -> str:
 
     mensagem = choices[0].get("message") or {}
     conteudo = mensagem.get("content")
-    if not isinstance(conteudo, str) or not conteudo.strip():
-        raise ErroProvider("resposta chegou sem conteúdo textual")
-
+    if conteudo is None:
+        return ""
+    if not isinstance(conteudo, str):
+        raise ErroProvider("resposta chegou com conteúdo não textual")
     return conteudo
 
 
@@ -83,6 +84,8 @@ class OpenAICompatProvider:
         timeout_segundos: int = 120,
         prompt_sistema: str = PROMPT_SISTEMA_PADRAO,
         api_key: str | None = None,
+        max_tokens: int = 8192,
+        tentativas_sem_conteudo: int = 2,
         _postar: Transporte | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -90,6 +93,8 @@ class OpenAICompatProvider:
         self._timeout_segundos = timeout_segundos
         self._prompt_sistema = prompt_sistema
         self._api_key = api_key
+        self._max_tokens = max_tokens
+        self._tentativas_sem_conteudo = tentativas_sem_conteudo
         self._postar: Transporte = _postar or _postar_json
         self._mensagens: list[dict[str, str]] = []
 
@@ -100,24 +105,35 @@ class OpenAICompatProvider:
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
 
-        corpo = {
+        corpo: dict[str, Any] = {
             "model": self._modelo,
             "messages": [
                 {"role": "system", "content": self._prompt_sistema},
                 *self._mensagens,
             ],
         }
+        if self._max_tokens > 0:
+            corpo["max_tokens"] = self._max_tokens
 
         url = f"{self._base_url}/chat/completions"
         try:
-            resposta = self._postar(url, corpo, headers, self._timeout_segundos)
+            for _ in range(self._tentativas_sem_conteudo):
+                conteudo = _extrair_conteudo(
+                    self._postar(url, corpo, headers, self._timeout_segundos)
+                )
+                if conteudo:
+                    self._mensagens.append({"role": "assistant", "content": conteudo})
+                    return conteudo
         except ErroProvider:
             self._mensagens.pop()
             raise
 
-        conteudo = _extrair_conteudo(resposta)
-        self._mensagens.append({"role": "assistant", "content": conteudo})
-        return conteudo
+        self._mensagens.pop()
+        raise ErroProvider(
+            f"resposta chegou sem conteúdo textual {self._tentativas_sem_conteudo}x no modelo "
+            f"'{self._modelo}' ({self._base_url}) — pode ser o raciocínio do modelo estourando "
+            "o teto de tokens: aumente 'max_tokens' em provedor.openai_compat no config.yaml"
+        )
 
     def reiniciar(self) -> None:
         self._mensagens.clear()

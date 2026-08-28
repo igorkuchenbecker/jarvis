@@ -50,7 +50,7 @@ pipelines cadastrados (allowlist por nome).
   desligados por padrão; ligam por configuração. A **busca web** (`pesquisar`/`web.buscar`)
   é READ_ONLY com DuckDuckGo (sem chave de API) e vem ligada — o Second Brain continua a
   fonte principal: a web só é consultada quando o conhecimento local não responde.
-- **262 testes offline** (fakes/mocks, zero rede); decisões técnicas registradas em
+- **266 testes offline** (fakes/mocks, zero rede); decisões técnicas registradas em
   `docs/DECISOES.md`; estado atual e dívida técnica em `docs/PROJECT_STATE.md`
 
 ## Como rodar

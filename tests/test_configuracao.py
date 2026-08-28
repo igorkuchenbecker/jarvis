@@ -128,6 +128,7 @@ def test_carregar_configuracao_sem_arquivo_usa_padroes_de_openai_compat(
     assert configuracao.openai_compat.modelo == "llama3"
     assert configuracao.openai_compat.api_key_env == ""
     assert configuracao.openai_compat.timeout_segundos == 120
+    assert configuracao.openai_compat.max_tokens == 8192
 
 
 def test_carregar_configuracao_le_secao_openai_compat_do_arquivo(tmp_path: Path) -> None:
@@ -138,7 +139,8 @@ def test_carregar_configuracao_le_secao_openai_compat_do_arquivo(tmp_path: Path)
         "    base_url: https://api.groq.com/openai/v1\n"
         "    modelo: llama-3.3-70b-versatile\n"
         "    api_key_env: GROQ_API_KEY\n"
-        "    timeout_segundos: 45\n",
+        "    timeout_segundos: 45\n"
+        "    max_tokens: 16384\n",
         encoding="utf-8",
     )
 
@@ -148,3 +150,4 @@ def test_carregar_configuracao_le_secao_openai_compat_do_arquivo(tmp_path: Path)
     assert configuracao.openai_compat.modelo == "llama-3.3-70b-versatile"
     assert configuracao.openai_compat.api_key_env == "GROQ_API_KEY"
     assert configuracao.openai_compat.timeout_segundos == 45
+    assert configuracao.openai_compat.max_tokens == 16384

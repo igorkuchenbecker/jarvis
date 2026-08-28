@@ -16,6 +16,7 @@ provedor:
     modelo: llama3
     api_key_env: ""  # nome da var de ambiente com a chave (ex: GROQ_API_KEY); vazio = sem auth (Ollama)
     timeout_segundos: 120
+    max_tokens: 8192  # teto de tokens de saída; modelos com raciocínio (ex: gpt-oss no Groq) estouram o default do servidor e voltam vazios
 
 limites:
   max_iteracoes_por_objetivo: 12

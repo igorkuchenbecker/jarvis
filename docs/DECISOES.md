@@ -4,6 +4,25 @@ Formato: data | decisão | motivo | alternativas consideradas | consequências
 
 ---
 
+**2026-08-28** | `openai_compat` ganhou `max_tokens` configurável (default 8192) + retry
+automático (2 tentativas) para resposta vazia | Bug real na conversa: o user perguntou algo
+simples e o JARVIS respondeu `erro: resposta chegou sem conteúdo textual`. Diagnóstico: o
+provider não enviava `max_tokens`, e o default do Groq (baixo) em modelos reasoning
+(`openai/gpt-oss-120b` emite um campo `reasoning` que consome do teto antes do `content`) às
+vezes estourava o orçamento → `choices[0].message.content` voltava `null` (200 sem conteúdo),
+e `_extrair_conteudo` levantava o erro. Confirmado por chamada real bruta: a mesma request com
+UA do provider devolve 200 com `content` JSON + campo `reasoning`; com `max_tokens: 4096`
+responde normal. De quebra foi corrigido um bug latente: em falha de extração de conteúdo a
+mensagem do usuário ficava no histórico (só falhas HTTP a removiam), deslocando o histórico
+nas tentativas seguintes — agora qualquer falha remove a mensagem | Alternativas: (a) só retry
+sem `max_tokens` (insuficiente — o estouro de tokens é a causa, não o sintoma); (b) ler
+`message.reasoning` como conteúdo (rejeitado: raciocínio de CoT não é resposta/acao JSON);
+(c) usar `max_completion_tokens` (fora do padrão OpenAI-compat, quebraria Ollama/OpenRouter) |
+`max_tokens: 0` desliga o campo (usa default do servidor, p/ quem quer comportamento antigo);
+retry só acontece para resposta vazia (200 sem conteúdo), nunca para erro HTTP; testes:
+266 passed, ruff + mypy limpos; conversa real validada na máquina (resposta com conteúdo e
+ferramenta bloqueada pelo jail "autocorrigida" pelo modelo). Versão `1.3.1`.
+
 **2026-08-28** | Busca web sem chave via DuckDuckGo HTML, com o Second Brain como fonte
 principal | O usuário pediu explicitamente que o JARVIS "possa pesquisar na Web, mas com o
 SecondBrain como fonte principal". DuckDuckGo HTML não exige chave/assinatura (zero custo,

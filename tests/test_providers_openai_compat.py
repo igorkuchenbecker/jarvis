@@ -41,6 +41,10 @@ def _resposta(texto: str) -> dict[str, Any]:
     return {"choices": [{"message": {"role": "assistant", "content": texto}}]}
 
 
+def _resposta_sem_conteudo() -> dict[str, Any]:
+    return {"choices": [{"message": {"role": "assistant"}}]}
+
+
 def test_envia_mensagem_e_recebe_resposta() -> None:
     transporte = TransporteFalso([_resposta("Brasília.")])
     provider = OpenAICompatProvider(
@@ -145,12 +149,62 @@ def test_resposta_sem_choices_levanta_erro() -> None:
         provider.enviar("oi")
 
 
-def test_resposta_sem_conteudo_textual_levanta_erro() -> None:
-    transporte = TransporteFalso([{"choices": [{"message": {"role": "assistant"}}]}])
+def test_resposta_sem_conteudo_textual_levanta_erro_informativo() -> None:
+    transporte = TransporteFalso(
+        [_resposta_sem_conteudo(), _resposta_sem_conteudo(), _resposta("funcionou")]
+    )
+    provider = OpenAICompatProvider(
+        base_url="http://localhost:11434/v1", modelo="m", _postar=transporte
+    )
+
+    with pytest.raises(ErroProvider, match="sem conteúdo textual"):
+        provider.enviar("oi")
+
+    url, corpo, _, _ = transporte.chamadas[0]
+    assert url == "http://localhost:11434/v1/chat/completions"
+    assert corpo["model"] == "m"
+
+
+def test_resposta_sem_conteudo_retenta_e_recupera() -> None:
+    transporte = TransporteFalso([_resposta_sem_conteudo(), _resposta("recuperou")])
     provider = OpenAICompatProvider(_postar=transporte)
 
-    with pytest.raises(ErroProvider, match="sem conteúdo"):
-        provider.enviar("oi")
+    resposta = provider.enviar("oi")
+
+    assert resposta == "recuperou"
+    assert len(transporte.chamadas) == 2
+
+
+def test_resposta_sem_conteudo_persistente_nao_suja_o_historico() -> None:
+    transporte = TransporteFalso(
+        [_resposta_sem_conteudo(), _resposta_sem_conteudo(), _resposta("depois do erro")]
+    )
+    provider = OpenAICompatProvider(_postar=transporte)
+
+    with pytest.raises(ErroProvider, match="max_tokens"):
+        provider.enviar("mensagem que falha")
+    provider.enviar("mensagem que funciona")
+
+    mensagens = transporte.chamadas[2][1]["messages"]
+    assert [m["content"] for m in mensagens[1:]] == ["mensagem que funciona"]
+
+
+def test_envia_max_tokens_no_corpo() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(max_tokens=4096, _postar=transporte)
+
+    provider.enviar("oi")
+
+    assert transporte.chamadas[0][1]["max_tokens"] == 4096
+
+
+def test_max_tokens_zero_nao_envia_campo() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(max_tokens=0, _postar=transporte)
+
+    provider.enviar("oi")
+
+    assert "max_tokens" not in transporte.chamadas[0][1]
 
 
 def test_extrair_conteudo_rejeita_payloads_maliciosos() -> None:

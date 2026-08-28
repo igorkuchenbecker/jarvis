@@ -1,8 +1,8 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.3.0 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
+**Versão:** 1.3.1 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
 openai_compat, +jail de leitura ampliada, +integração GDAP, +busca web com Second Brain como
-fonte principal, todos pós-1.0)
+fonte principal, +robustez openai_compat/max_tokens+retry, todos pós-1.0)
 **Última atualização:** 2026-08-28
 
 ## Feito
@@ -474,6 +474,19 @@ Um comportamento observado no E2E (não é bug do web, é limitação pré-exist
 relativo errado com `fs.read`. Se reconstruir o caminho completo do arquivo citado for
 necessário, é mudança no formato da citação do `RepositorioConhecimento` — registrar como
 melhoria futura, não dívida desta fatia.
+
+## Pós-1.0 — Robustez openai_compat (bug-1.3.1)
+
+Bug real reportado pelo usuário: pergunta simples na conversa → `erro: resposta chegou sem
+conteúdo textual`. Causa raiz: o provider não enviava `max_tokens`; o default do Groq (baixo)
+em modelos reasoning (`openai/gpt-oss-120b` emite um campo `reasoning`) estourava o teto às
+vezes e `content` voltava `null` (HTTP 200 sem conteúdo). Correção: `max_tokens` configurável
+(`provedor.openai_compat.max_tokens`, default 8192, `0` desliga) + retry automático de 2
+tentativas para resposta sem conteúdo + erro final com dica sobre `max_tokens`. Bug latente
+corrigido de quebra: falha de extração de conteúdo passou a remover a mensagem do usuário do
+histórico (antes só falhas HTTP faziam isso). Validado na máquina real: conversa real respondeu
+com conteúdo e o modelo "se autocorrigiu" após uma ferramenta ser bloqueada pelo jail.
+4 testes novos; suíte 266 passed. Versão `1.3.1`.
 
 ## Próximo passo
 

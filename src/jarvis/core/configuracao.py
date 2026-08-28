@@ -25,6 +25,11 @@ class ConfiguracaoOpenAiCompat:
     modelo: str = "llama3"
     api_key_env: str = ""
     timeout_segundos: int = 120
+    # Teto de tokens de saída por chamada. Modelos com raciocínio (ex.: openai/gpt-oss-120b
+    # no Groq) emitem um campo `reasoning` que consome desse teto antes do `content` — com o
+    # default do servidor (baixo) a resposta pode vir com `content` vazio. 0 = não enviar o
+    # campo (usa o default do servidor).
+    max_tokens: int = 8192
 
 
 @dataclass(frozen=True)
@@ -162,6 +167,9 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             modelo=str(openai_compat_bruto.get("modelo", "llama3")),
             api_key_env=str(openai_compat_bruto.get("api_key_env", "")),
             timeout_segundos=int(openai_compat_bruto.get("timeout_segundos", 120)),
+            max_tokens=int(
+                openai_compat_bruto.get("max_tokens", ConfiguracaoOpenAiCompat().max_tokens)
+            ),
         ),
         autonomia=ConfiguracaoAutonomia(
             nivel=autonomia_bruta.get("nivel", padroes_autonomia.nivel),
