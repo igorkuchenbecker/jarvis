@@ -30,6 +30,10 @@ class ConfiguracaoOpenAiCompat:
     # default do servidor (baixo) a resposta pode vir com `content` vazio. 0 = não enviar o
     # campo (usa o default do servidor).
     max_tokens: int = 8192
+    # Alguns modelos (ex.: gpt-oss no Groq) emitem tool calling nativa mesmo quando a API não
+    # declara ferramentas — o servidor então rejeita (HTTP 400 "tool choice is none"). Enviar
+    # `tools: []` + `tool_choice: "none"` força texto puro (protocolo de ações do JARVIS).
+    desabilitar_ferramentas_nativas: bool = True
 
 
 @dataclass(frozen=True)
@@ -169,6 +173,12 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             timeout_segundos=int(openai_compat_bruto.get("timeout_segundos", 120)),
             max_tokens=int(
                 openai_compat_bruto.get("max_tokens", ConfiguracaoOpenAiCompat().max_tokens)
+            ),
+            desabilitar_ferramentas_nativas=bool(
+                openai_compat_bruto.get(
+                    "desabilitar_ferramentas_nativas",
+                    ConfiguracaoOpenAiCompat().desabilitar_ferramentas_nativas,
+                )
             ),
         ),
         autonomia=ConfiguracaoAutonomia(

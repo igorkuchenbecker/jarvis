@@ -207,6 +207,28 @@ def test_max_tokens_zero_nao_envia_campo() -> None:
     assert "max_tokens" not in transporte.chamadas[0][1]
 
 
+def test_desabilita_ferramentas_nativas_por_padrao() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(_postar=transporte)
+
+    provider.enviar("oi")
+
+    corpo = transporte.chamadas[0][1]
+    assert corpo["tools"] == []
+    assert corpo["tool_choice"] == "none"
+
+
+def test_desabilita_ferramentas_nativas_pode_ser_ligada_de_novo() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(desabilitar_ferramentas_nativas=False, _postar=transporte)
+
+    provider.enviar("oi")
+
+    corpo = transporte.chamadas[0][1]
+    assert "tools" not in corpo
+    assert "tool_choice" not in corpo
+
+
 def test_extrair_conteudo_rejeita_payloads_maliciosos() -> None:
     with pytest.raises(ErroProvider):
         _extrair_conteudo({})

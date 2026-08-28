@@ -86,6 +86,7 @@ class OpenAICompatProvider:
         api_key: str | None = None,
         max_tokens: int = 8192,
         tentativas_sem_conteudo: int = 2,
+        desabilitar_ferramentas_nativas: bool = True,
         _postar: Transporte | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -94,6 +95,7 @@ class OpenAICompatProvider:
         self._prompt_sistema = prompt_sistema
         self._api_key = api_key
         self._max_tokens = max_tokens
+        self._desabilitar_ferramentas_nativas = desabilitar_ferramentas_nativas
         self._tentativas_sem_conteudo = tentativas_sem_conteudo
         self._postar: Transporte = _postar or _postar_json
         self._mensagens: list[dict[str, str]] = []
@@ -114,6 +116,9 @@ class OpenAICompatProvider:
         }
         if self._max_tokens > 0:
             corpo["max_tokens"] = self._max_tokens
+        if self._desabilitar_ferramentas_nativas:
+            corpo["tools"] = []
+            corpo["tool_choice"] = "none"
 
         url = f"{self._base_url}/chat/completions"
         try:

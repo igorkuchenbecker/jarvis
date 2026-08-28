@@ -23,6 +23,29 @@ retry só acontece para resposta vazia (200 sem conteúdo), nunca para erro HTTP
 266 passed, ruff + mypy limpos; conversa real validada na máquina (resposta com conteúdo e
 ferramenta bloqueada pelo jail "autocorrigida" pelo modelo). Versão `1.3.1`.
 
+---
+
+**2026-08-28** | `openai_compat` envia `tools: []` + `tool_choice: "none"` por padrão
+(flag `desabilitar_ferramentas_nativas`) | Logo após o fix do 1.3.1, a conversa real passou a
+responder com HTTP 400 `tool_use_failed` ("Tool choice is none, but model called a tool",
+`failed_generation` = `{"name": "fs.read", ...}`): o `openai/gpt-oss-120b` do Groq emite
+**tool calling nativa** de forma não-determinística mesmo quando a API não declara ferramentas
+(`tools` ausente = tool_choice none), e o servidor rejeita a geração. `pesquisar`/`fs.read` dos
+schemas no prompt-sistema são os alvos em que o modelo escorrega. Confirmação empírica na
+máquina (request real repetido): só `tools: []` bastava mas às vezes voltava `content` vazio;
+`tool_choice: "none"` (com ou sem `tools: []`) devolveu texto puro em todas as tentativas.
+Alternativas: (a) implementar tool calling nativa no provider mapeando `tool_calls` para o
+executor (descartada: duplicaria o protocolo de ações em texto puro, ferramentas declaradas
+seriam subset do registro do JARVIS); (b) só `tool_choice: "none"` (descartado por
+compatibilidade: spec OpenAI exige `tools` quando `tool_choice` é usado, alguns servidores
+rejeitam isolado) | `tools: []` + `tool_choice: "none"` juntos é o combo mais compatível para
+forçar texto puro; `desabilitar_ferramentas_nativas: false` restaura o comportamento antigo
+para servidores que recusem o combo. Retry de conteúdo vazio (bug-1.3.1) mantido — ainda há
+respostas 200 com `content` vazio ocasional. Validado na máquina via conversa real: pergunta
+sobre código limpo respondeu com resumo real do Second Brain (modelo chamou `pesquisar`).
+268 testes passaram; o passo seguinte no E2E esbarrou só no rate limit do plano (HTTP 429 TPM
+8000), não em bug. Versão `1.3.2`.
+
 **2026-08-28** | Busca web sem chave via DuckDuckGo HTML, com o Second Brain como fonte
 principal | O usuário pediu explicitamente que o JARVIS "possa pesquisar na Web, mas com o
 SecondBrain como fonte principal". DuckDuckGo HTML não exige chave/assinatura (zero custo,

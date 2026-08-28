@@ -1,8 +1,8 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.3.1 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
+**Versão:** 1.3.2 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
 openai_compat, +jail de leitura ampliada, +integração GDAP, +busca web com Second Brain como
-fonte principal, +robustez openai_compat/max_tokens+retry, todos pós-1.0)
+fonte principal, +robustez openai_compat max_tokens/retry/sem tool calling, todos pós-1.0)
 **Última atualização:** 2026-08-28
 
 ## Feito
@@ -475,9 +475,9 @@ relativo errado com `fs.read`. Se reconstruir o caminho completo do arquivo cita
 necessário, é mudança no formato da citação do `RepositorioConhecimento` — registrar como
 melhoria futura, não dívida desta fatia.
 
-## Pós-1.0 — Robustez openai_compat (bug-1.3.1)
+## Pós-1.0 — Robustez openai_compat (bug-1.3.1 e 1.3.2)
 
-Bug real reportado pelo usuário: pergunta simples na conversa → `erro: resposta chegou sem
+Bug 1.3.1 reportado pelo usuário: pergunta simples na conversa → `erro: resposta chegou sem
 conteúdo textual`. Causa raiz: o provider não enviava `max_tokens`; o default do Groq (baixo)
 em modelos reasoning (`openai/gpt-oss-120b` emite um campo `reasoning`) estourava o teto às
 vezes e `content` voltava `null` (HTTP 200 sem conteúdo). Correção: `max_tokens` configurável
@@ -486,7 +486,15 @@ tentativas para resposta sem conteúdo + erro final com dica sobre `max_tokens`.
 corrigido de quebra: falha de extração de conteúdo passou a remover a mensagem do usuário do
 histórico (antes só falhas HTTP faziam isso). Validado na máquina real: conversa real respondeu
 com conteúdo e o modelo "se autocorrigiu" após uma ferramenta ser bloqueada pelo jail.
-4 testes novos; suíte 266 passed. Versão `1.3.1`.
+
+Bug 1.3.2 (sequência, mesma noite): a conversa real passou a responder HTTP 400 `tool_use_failed`
+("Tool choice is none, but model called a tool") — o `gpt-oss-120b` do Groq emite tool calling
+nativa não-determinística mesmo sem `tools` declarado na API. Correção: o provider envia
+`tools: []` + `tool_choice: "none"` por padrão (flag `desabilitar_ferramentas_nativas`, `false`
+restaura o comportamento antigo), forçando o protocolo de ações em texto puro. Validado na
+máquina: conversa real respondeu com resumo real do Second Brain (`pesquisar` chamado sozinho).
+
+4 + 2 testes novos; suíte 268 passed. Versões `1.3.1` e `1.3.2`.
 
 ## Próximo passo
 
