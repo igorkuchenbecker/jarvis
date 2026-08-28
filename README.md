@@ -1,13 +1,33 @@
 # JARVIS
 
-Agente pessoal autônomo para Linux: conversa por texto ou voz, roda ferramentas no sistema
-(inclusive mouse/teclado/janelas), planeja objetivos em subtarefas com checkpoint e retomada
-pós-crash, busca em documentos locais e enxerga a tela. O modelo nunca executa nada diretamente
-— toda ação passa por um executor que valida schema, caminho e nível de risco antes de rodar.
+Assistente pessoal para Linux: conversa por texto ou voz, executa ferramentas no
+sistema (mouse/teclado/janelas), decompõe objetivos em subtarefas com checkpoint
+e retomada pós-crash, busca em documentos locais e pode analisar o que está na
+tela. O modelo nunca executa nada diretamente — toda ação passa por um executor
+que valida schema, caminho e nível de risco antes de rodar.
 
-Python 3.14 · SQLite + FTS5 · Rich · Claude Code como LLM (`claude -p`, sem chave de API)
+Python 3.14 · SQLite + FTS5 · Rich
 
-## Comandos
+## Finalidade
+
+Automatizar tarefas no próprio computador via linguagem natural, com segurança
+e auditoria: pedir comandos, agendar objetivos longos que se retomam sozinhos
+se quebrar, consultar conhecimento local com citação, e operar a máquina (voz,
+mouse, teclado e janelas) sempre sob aprovação humana quando o risco exige.
+
+## Como funciona
+
+```text
+Você ──> jarvis ──> modelo de IA ──> executor valida schema/risco/caminho ──> ferramenta
+                <────────────────────── resultado + auditoria ──────────────────
+```
+
+- **Executor único**: valida JSON Schema, jail de caminhos (travessia e symlink) e
+  allowlist de binários antes de qualquer ferramenta rodar; `sudo`/`su`/`doas`/`pkexec`
+  são recusados em código
+- **Risco READ_ONLY → CRITICAL** mapeado à autonomia 0–5; HIGH/CRITICAL sempre pedem
+  aprovação interativa (fail-closed se não houver ninguém para perguntar)
+- **Comandos**:
 
 | Comando | Função |
 |---|---|
@@ -18,30 +38,21 @@ Python 3.14 · SQLite + FTS5 · Rich · Claude Code como LLM (`claude -p`, sem c
 | `jarvis voz check` | Lista mic/saída padrão do sistema e testa reprodução |
 | `jarvis voz falar` | Conversa por voz push-to-talk (ENTER grava), com as mesmas ferramentas do modo texto |
 
-Ferramentas disponíveis ao modelo: `fs.read/write/list`, `memory.store/search`,
-`sys.info`, `proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`,
-e — com `computador.habilitada: true` — `computador.listar_janelas/mover_mouse/clicar/digitar/tecla`.
-Com `gdap.habilitada: true`, ganha `gdap.status/listar_datasets/consultar/perguntar` (consulta o
-catálogo e o analista de IA do [GDAP](https://github.com/igorkuchenbecker/gdap), projeto irmão de automação de dados) e
-`gdap.executar_pipeline` (roda um pipeline de dados já cadastrado, allowlist por nome).
+Ferramentas disponíveis: `fs.read/write/list`, `memory.store/search`, `sys.info`,
+`proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`
+e — com `computador.habilitada: true` — `computador.listar_janelas/mover_mouse/
+clicar/digitar/tecla`. Com `gdap.habilitada: true`, consulta o catálogo de dados e
+o analista de IA do [GDAP](https://github.com/igorkuchenbecker/gdap) e executa
+pipelines cadastrados (allowlist por nome).
 
-## Segurança
+- **Voz** (STT/TTS locais), **computer use** (mouse/teclado/janelas) e **GDAP** vêm
+  desligados por padrão; ligam por configuração
+- **247 testes offline** (fakes/mocks, zero rede); decisões técnicas registradas em
+  `docs/DECISOES.md`; estado atual e dívida técnica em `docs/PROJECT_STATE.md`
 
-- Executor único valida schema JSON, jail de caminhos (travessia e symlink) e allowlist
-  de binários antes de rodar qualquer ferramenta
-- Risco READ_ONLY → CRITICAL mapeado à autonomia 0–5; HIGH/CRITICAL sempre pedem aprovação
-  interativa, e sem ninguém para perguntar a ação é recusada (fail-closed)
-- `sudo`/`su`/`doas`/`pkexec` recusados em código, mesmo que apareçam na allowlist;
-  `terminal.exec` sem `shell=True`, ambiente sanitizado e saída truncada
-- `vision.analyze` não grava nada automaticamente — memória só é escrita por pedido explícito
-- Ferramentas de computer use (`computador.clicar/digitar/tecla`) são CRITICAL e ficam
-  desligadas por padrão (`computador.habilitada: false`) — nenhum allowlist consegue restringir
-  com segurança o que pode ser clicado/digitado, então a defesa é a aprovação interativa sempre
-  exigida para esse nível de risco, mais o gate explícito de configuração
+## Como rodar
 
-## Rodando
-
-Requer Python 3.14+ e a CLI do `claude` logada (usa a assinatura existente):
+Requer Python 3.14+:
 
 ```sh
 python3.14 -m venv .venv
@@ -51,8 +62,8 @@ python3.14 -m venv .venv
 scripts/check.sh                # ruff + mypy --strict + pytest
 ```
 
-Para voz, instale o extra `voz` (`sounddevice`, `numpy`, `faster-whisper`, `piper-tts` — STT/TTS
-rodam localmente, modelos baixados automaticamente no primeiro uso):
+Voz (extra `voz` — sounddevice, numpy, faster-whisper, piper-tts; STT/TTS rodam
+localmente, modelos baixados automaticamente no primeiro uso):
 
 ```sh
 .venv/bin/pip install -e ".[dev,voz]"
@@ -60,35 +71,29 @@ rodam localmente, modelos baixados automaticamente no primeiro uso):
 .venv/bin/jarvis voz falar     # requer voz.habilitada: true em config.yaml
 ```
 
-Para computer use (mouse/teclado/janelas), instale o extra `computador` (`evdev`) e ligue
-`computador.habilitada: true` em `config.yaml`. Requer acesso de escrita a `/dev/uinput`
-(verifique com `getfacl /dev/uinput` — em algumas distros já vem liberado por regras udev de
-outros programas, como KDE Connect; caso contrário, é necessário configurar isso manualmente):
+Computer use (extra `computador` — evdev) e o gate em `config.yaml`:
 
 ```sh
 .venv/bin/pip install -e ".[dev,voz,computador]"
 ```
 
-Para usar o [GDAP](https://github.com/igorkuchenbecker/gdap) (catálogo de dados, consultas, analista de IA, pipelines), rode o
-servidor dele (`gdap system serve`, ou o serviço systemd `--user` — ver `~/gdap/README.md`),
-gere uma chave (`gdap system key create jarvis --role engineer` — `analyst` não basta para
-pipelines que escrevem dados) e ligue em `config.yaml`:
+```yaml
+computador:
+  habilitada: true   # requer escrita em /dev/uinput (verifique com getfacl)
+```
+
+GDAP (projeto irmão de automação de dados): rode o servidor dele, gere uma chave
+com papel `engineer` e ligue em `config.yaml` — sem dependência nova (cliente
+`urllib` da stdlib).
 
 ```yaml
 gdap:
   habilitada: true
   base_url: http://127.0.0.1:8000
-  api_key_env: GDAP_API_KEY   # exporte a chave nessa variável, nunca no config.yaml
+  api_key_env: GDAP_API_KEY   # exporte a chave na variável, nunca no config.yaml
   pipelines_permitidos: [nome_do_pipeline]
 ```
 
-Zero dependência nova — o cliente usa `urllib` da stdlib, mesmo estilo do provider `openai_compat`.
-
 Configuração opcional em `config.yaml` (modelo em `config.yaml.example`): autonomia,
-jail de caminhos, allowlist, diretórios de conhecimento, voz e computador. Sem arquivo, roda com
-os padrões embutidos (tudo que é arriscado — voz, computer use — vem desligado por padrão).
-
-247 testes, todos offline (`FakeProvider`/mocks, zero rede — os `scripts/validar_*_real.py` são
-validação manual à parte, fora da suíte, que de fato baixam modelos/tocam hardware). Decisões
-técnicas registradas em `docs/DECISOES.md`; estado atual e dívida técnica em
-`docs/PROJECT_STATE.md`.
+jail de caminhos, allowlist, diretórios de conhecimento, voz e computador. Sem
+arquivo, roda com os padrões embutidos (tudo que é arriscado vem desligado).
