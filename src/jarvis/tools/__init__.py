@@ -9,6 +9,7 @@ from jarvis.io.gdap import ClienteGdap
 from jarvis.memory.armazenamento import RepositorioMemoria
 from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.providers import ErroProvider, criar_provider_visao
+from jarvis.tools.autor import criar_ferramentas_autoconsciencia
 from jarvis.tools.base import Ferramenta, NivelRisco
 from jarvis.tools.computador import criar_ferramentas_computador
 from jarvis.tools.conhecimento import criar_ferramentas_conhecimento
@@ -38,6 +39,9 @@ def criar_registro_ferramentas_padrao(configuracao: Configuracao) -> RegistroFer
         registro.registrar(ferramenta)
 
     for ferramenta in criar_ferramentas_sistema(configuracao.limites.timeout_por_passo_segundos):
+        registro.registrar(ferramenta)
+
+    for ferramenta in criar_ferramentas_autoconsciencia(configuracao):
         registro.registrar(ferramenta)
 
     repositorio_conhecimento = RepositorioConhecimento(configuracao.caminhos.banco_dados)

@@ -781,3 +781,22 @@ quem não cria/edita `config.yaml` volta a gastar o Pro — documentado em PROJE
 270 passed (2 novos), ruff + mypy --strict limpos. Conversa real validada: `qwen3:4b` chamou
 `conhecimento.buscar` sozinho e respondeu sobre o Clean Code indexado no Second Brain, sem rede.
 Versão `1.3.3`.
+
+**2026-08-28** | Ferramentas de autoconhecimento e automanutenção adicionadas em `tools/autor.py`
+(prefixo `auto.`: `auto.info`, `auto.mudancas` READ_ONLY; `auto.atualizar`, `auto.editar`,
+`auto.commit` HIGH) | Usuário: "quero que ele saiba quais foram as últimas mudanças no próprio
+software, saiba quais os provider usa, e consiga se atualizar / fazer mudanças nele". Até então o
+JARVIS não conseguia nem dizer com qual provider rodava (a conversa falhou justamente nisso) nem
+editar o próprio código. Os `auto.*` fecham isso com as 5 ferramentas | Alternativas: (a) ampliar o
+`jail_paths` do config para incluir `~/jarvis` e usar `fs.write` normal (RECUSADO no executor:
+`fs.write` é LOW e ficaria liberado em autonomia 2 sem aprovação nenhuma — editar o próprio código
+tem que passar por aprovação humana sempre); (b) `auto.editar` com caminho resolvido do cwd do
+processo (RECUSADO: caminho relativo podia sair do repo; agora resolve a partir de `RAIZ_JARVIS_PADRAO`
+e recusa qualquer coisa fora dela e dentro de `.git`); (c) `auto.atualizar` usando `shell=True`
+(RECUSADO: mesmos motivos do `terminal.exec` — comandos git/pip/bash fixos, sem shell livre,
+ambiente minimizado PATH/HOME/LANG + SSH_AUTH_SOCK só se já existir) | Consequências: o modelo agora
+consegue se atualizar e se corrigir com aprovação humana obrigatória para QUALQUER mutação (HIGH/
+CRITICAL sempre exigem, fail-closed sem callback). Não há push automático — publicar no GitHub
+continua à escolha do usuário. 19 testes novos em `tests/test_tools_autor.py` cobrem parsing,
+confinamento, rollback, bloqueio com mudanças locais, fetch sem internet e o gating HIGH/CRITICAL do
+Executor. Suíte 289 passed, ruff + mypy --strict limpos. Versão `1.4.0`.

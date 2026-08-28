@@ -257,3 +257,21 @@ pipeline fora da allowlist é recusado sem sequer chamar o GDAP. Versão `1.2.0`
 a chamada bloqueante ao provider/loop em `_executar_conversa`/`_executar_conversa_voz`, já que o
 projeto não faz streaming (decisão do M1). Validado numa sessão real de terminal via `script`
 (pseudo-tty) — ver `docs/DECISOES.md` pelo comando exato e o que o log confirmou. Versão `1.0.1`.
+
+## Pós-1.0 — Modo 100% local e autoconhecimento (não é um marco novo do roadmap)
+
+Por decisão do usuário (28/08), o provider ativo do JARVIS é um **Ollama local** (config.yaml não
+versionado: `llm_padrao: openai_compat`, `base_url: http://localhost:11434/v1`, modelo
+`qwen3:4b`). O default embutido do código continua `claude_cli` (Claude Code via `claude -p`,
+que consome a assinatura Pro do usuário — por isso o config.yaml local manda no LLM). A web
+(DuckDuckGo) segue disponível quando há conexão; sem rede, `pesquisar`/`web.buscar` devolvem
+mensagem amigável em vez de falhar.
+
+`tools/autor.py` cobre autoconhecimento e automanutenção (registrado sempre): `auto.info`
+(READ_ONLY: versão, provider ativo com detalhe, estado do git), `auto.mudancas` (READ_ONLY:
+git log), e `auto.atualizar`/`auto.editar`/`auto.commit` (**HIGH** — aprovação humana sempre).
+Por design, `~/jarvis` NÃO está no `jail_paths` (senão `fs.write` LOW liberaria edição do próprio
+código em autonomia 2); `auto.editar` confina caminhos à raiz do repo internamente (caminhos
+relativos resolvem da raiz; recusa qualquer coisa fora dela e dentro de `.git`) com rollback.
+Sem push automático — publicar no GitHub é decisão do usuário. 19 testes em
+`tests/test_tools_autor.py`; suíte 289 passed. Versão `1.4.0`.

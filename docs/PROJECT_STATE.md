@@ -1,9 +1,10 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.3.3 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
+**Versão:** 1.4.0 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
 openai_compat, +jail de leitura ampliada, +integração GDAP, +busca web com Second Brain como
 fonte principal, +robustez openai_compat max_tokens/retry/sem tool calling, +modo 100% local
-com Ollama e web amigável offline, todos pós-1.0)
+com Ollama e web amigável offline, +autoconhecimento e automanutenção (auto.*), +detalhe da
+configuração ativa no auto.info e provider padrão alternável, todos pós-1.0)
 **Última atualização:** 2026-08-28
 
 ## Feito
@@ -525,6 +526,42 @@ capítulos do Clean Code indexados — zero uso de rede/Pro no raciocínio. Suí
 antigo até ser reiniciado (só o config.yaml é lido na inicialização). Visão (M7) depende do
 `ClaudeCliVisionProvider` — não é coberta pelo Ollama local (qwen3:4b é só texto); `vision.analyze`
 fica indisponível com `llm_padrao: openai_compat` (provê compatível exigiria um modelo VL).
+
+## Pós-1.0 — Autoconhecimento e automanutenção (auto.*, a pedido do usuário)
+
+O usuário pediu que o JARVIS soubesse identificar as últimas mudanças do próprio software, dissesse
+com qual provider está rodando (claude_cli vs Ollama) e conseguisse se atualizar / se modificar.
+Novo módulo `tools/autor.py` com 5 ferramentas (registradas sempre, sem gate de config):
+
+- `auto.info` (READ_ONLY) — versão do pacote (`importlib.metadata`), provider ativo com detalhe
+  (`claude_cli` → binário; `openai_compat` → base_url/modelo/api_key_env/api_key_definida), endereço
+  do config.yaml e estado do git (branch, head, data/mensagem do último commit, arquivos não
+  commitados).
+- `auto.mudancas` (READ_ONLY) — `git log` (hash/data/mensagem), com `limite` 1–50.
+- `auto.atualizar` (HIGH) — sequência fixa: trava se houver alterações não commitadas →
+  `git fetch origin` (sem internet → resposta amigável) → `git rev-list HEAD..origin/<branch>` →
+  `git pull --ff-only` quando atrasado → `pip install --no-build-isolation -e .` →
+  `scripts/check.sh`. Nunca usa `shell=True`; ambiente minimizado (PATH/HOME/LANG +
+  SSH_AUTH_SOCK quando existir).
+- `auto.editar` (HIGH) — grava/sobrescreve arquivo DENTRO de `~/jarvis` com rollback
+  (`capturar_estado`/`reverter`, mesmos do fs.write). Caminhos relativos resolvem a partir da raiz
+  do repositório; recusa qualquer coisa fora dela e qualquer coisa dentro de `.git` (confinamento
+  próprio — `~/jarvis` NÃO entrou no `jail_paths` do config para não liberar `fs.write` LOW em
+  autonomia 2; ver DECISOES).
+- `auto.commit` (HIGH) — `git add -A` + `git commit -m <mensagem>` (msg vazia recusada).
+
+Motivação de segurança: toda mutação é HIGH → aprovação humana interativa SEMPRE (fail-closed sem
+callback); READ_ONLY livres. Não há push automático (usuario decide quando publicar no GitHub).
+
+Validado com 19 testes novos (`tests/test_tools_autor.py`): parsing de git log, limite, confinamento
+de caminho (fora do repo e dentro de `.git` recusados), rollback de edição (restaura e remove),
+bloqueio com mudanças locais, fetch sem internet, pull quando atrasado, commit, e o Executor
+recusando HIGH sem aprovação / rodando com aprovação / recusando schema inválido. Suíte 289 passed
+(ruff + mypy --strict + pytest). Versão `1.4.0`.
+
+**Atentar**: quem rodar `auto.atualizar` deve reiniciar a sessão do `jarvis` depois (o provider e o
+pacote novos só são lidos/carregados na inicialização). Visão (M7) segue dependente do
+`ClaudeCliVisionProvider` — não coberta pelo Ollama local.
 
 ## Próximo passo
 
