@@ -67,6 +67,7 @@ def criar_provider_llm(
                 api_key=api_key,
                 max_tokens=ajustes.max_tokens,
                 piso_max_tokens_raciocinio=ajustes.piso_max_tokens_raciocinio,
+                historico_teto_tokens=ajustes.historico_teto_tokens,
                 desabilitar_ferramentas_nativas=ajustes.desabilitar_ferramentas_nativas,
             )
         return OpenAICompatProvider(
@@ -77,6 +78,7 @@ def criar_provider_llm(
             prompt_sistema=prompt_sistema,
             max_tokens=ajustes.max_tokens,
             piso_max_tokens_raciocinio=ajustes.piso_max_tokens_raciocinio,
+            historico_teto_tokens=ajustes.historico_teto_tokens,
             desabilitar_ferramentas_nativas=ajustes.desabilitar_ferramentas_nativas,
         )
     raise ErroProvider(f"provedor de LLM '{configuracao.llm_padrao}' ainda não é suportado")

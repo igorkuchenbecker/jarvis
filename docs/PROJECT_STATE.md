@@ -136,6 +136,15 @@ configuração ativa no auto.info e provider padrão alternável, todos pós-1.0
   (`jarvis run`) recebem esses valores em vez de defaults fixos. `config.yaml.example` sincronizado
   (removidos campos de plano nunca implementados: `max_iteracoes_por_objetivo`,
   `teto_tokens_por_objetivo`, `teto_custo_usd_por_objetivo`).
+
+### Pós-1.0 — compressão de histórico (openai_compat)
+- `historico_teto_tokens` (padrão 3000, `0` = desliga): quando a conversa em memória do
+  `OpenAICompatProvider` estoura o teto aproximado de tokens, as mensagens antigas (restam as 2
+  mais recentes) são trocadas por um `system` com resumo gerado pelo próprio modelo (a chamada
+  de resumo usa `_solicitar_resumo`, sem recursão no `enviar` e sem tocar em histórico se o
+  resumo vier vazio). Validado na máquina com qwen3:4b: histórico comprimido com sucesso.
+  `historico_teto_tokens` baixo → compressão frequente, porém resumo granular demais; alto →
+  risco de estourar o `num_ctx` do Ollama (4096 numa 4b padrão).
 - `security/allowlist.py`: `validar_binario_permitido()` — recusa binário fora da allowlist E
   recusa `sudo`/`su`/`doas`/`pkexec` sempre, mesmo que apareçam na allowlist do config.
 - `security/executor.py`: `Executor` ganhou `nivel_autonomia`, `allowlist_binarios` e

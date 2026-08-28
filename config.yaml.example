@@ -18,6 +18,7 @@ provedor:
     timeout_segundos: 120
     max_tokens: 8192  # teto de tokens de saída; modelos com raciocínio (ex: gpt-oss no Groq) estouram o default do servidor e voltam vazios
     piso_max_tokens_raciocinio: 16384  # mínimo garantido p/ modelos que emitem `reasoning` antes do `content` (qwen3, gpt-oss, deepseek-r1...); 0 = sem piso
+    historico_teto_tokens: 3000  # teto aproximado de tokens do histórico; acima disso, as mensagens antigas viram resumo no próprio modelo; 0 = desliga
     desabilitar_ferramentas_nativas: true  # envia tools: [] + tool_choice: none (alguns modelos emitem tool call nativa sem a API declará-la -> HTTP 400)
 
 limites:

@@ -51,6 +51,28 @@ def _e_modelo_de_raciocinio(modelo: str) -> bool:
     return any(marca in nome for marca in MODELOS_DE_RACIOCINIO)
 
 
+PROMPT_SISTEMA_RESUMO = (
+    "Você comprime conversas de um assistente. Receba um histórico e devolva um resumo em "
+    "pt-BR, sem cabeçalhos nem listas numeradas, preservando fatos, intenções, decisões e "
+    'nomes de pessoas/ferramentas. Formato: "Resumo: <3-6 frases>".'
+)
+
+
+def _tokens_aproximados(mensagens: list[dict[str, str]]) -> int:
+    total = 0
+    for mensagem in mensagens:
+        total += max(1, len(mensagem.get("content", "")) // 4)
+    return total
+
+
+def _formatar_historico(mensagens: list[dict[str, str]]) -> str:
+    linhas = []
+    for mensagem in mensagens:
+        papel = "usuário" if mensagem["role"] == "user" else "assistente"
+        linhas.append(f"{papel}: {mensagem['content']}")
+    return "\n".join(linhas)
+
+
 def _postar_json(
     url: str, corpo: dict[str, Any], headers: dict[str, str], timeout: int
 ) -> dict[str, Any]:
@@ -109,6 +131,7 @@ class OpenAICompatProvider:
         tentativas_sem_conteudo: int = 2,
         desabilitar_ferramentas_nativas: bool = True,
         piso_max_tokens_raciocinio: int = 16384,
+        historico_teto_tokens: int = 3000,
         _postar: Transporte | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -125,11 +148,49 @@ class OpenAICompatProvider:
             self._max_tokens = max(max_tokens, piso_max_tokens_raciocinio)
         self._desabilitar_ferramentas_nativas = desabilitar_ferramentas_nativas
         self._tentativas_sem_conteudo = tentativas_sem_conteudo
+        self._teto_tokens_historico = historico_teto_tokens
         self._postar: Transporte = _postar or _postar_json
         self._mensagens: list[dict[str, str]] = []
 
+    def _solicitar_resumo(self) -> str:
+        corpo: dict[str, Any] = {
+            "model": self._modelo,
+            "messages": [
+                {"role": "system", "content": f"{self._prompt_sistema}\n\n{PROMPT_SISTEMA_RESUMO}"},
+                {"role": "user", "content": _formatar_historico(self._mensagens)},
+            ],
+        }
+        if self._desabilitar_ferramentas_nativas:
+            corpo["tools"] = []
+            corpo["tool_choice"] = "none"
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+        url = f"{self._base_url}/chat/completions"
+        try:
+            return _extrair_conteudo(self._postar(url, corpo, headers, self._timeout_segundos))
+        except ErroProvider:
+            return ""
+
+    def _comprimir_historico_se_necessario(self) -> None:
+        if self._teto_tokens_historico <= 0:
+            return
+        if _tokens_aproximados(self._mensagens) <= self._teto_tokens_historico:
+            return
+        if len(self._mensagens) <= 2:
+            return
+        resumo = self._solicitar_resumo()
+        if not resumo:
+            return
+        recentes = self._mensagens[-2:]
+        self._mensagens = [
+            {"role": "system", "content": f"Resumo da conversa anterior: {resumo}"},
+            *recentes,
+        ]
+
     def enviar(self, mensagem: str) -> str:
         self._mensagens.append({"role": "user", "content": mensagem})
+        self._comprimir_historico_se_necessario()
 
         headers = {"Content-Type": "application/json"}
         if self._api_key:

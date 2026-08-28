@@ -35,6 +35,11 @@ class ConfiguracaoOpenAiCompat:
     # ou cortado no meio de uma ação. Este piso garante um mínimo para esses modelos (0 = sem
     # piso). O valor de `max_tokens` acima, quando explicitamente maior, continua valendo.
     piso_max_tokens_raciocinio: int = 16384
+    # Quando o histórico da conversa (só do provider openai_compat, que guarda as mensagens em
+    # memória) passa deste teto aproximado de tokens, as mensagens antigas são trocadas por um
+    # resumo pedido ao próprio modelo. 0 = desliga a compressão. Ajuste conforme o contexto do
+    # modelo: para qwen3:4b no Ollama (num_ctx padrão 4096) algo em torno de 2000..3000.
+    historico_teto_tokens: int = 3000
     # Alguns modelos (ex.: gpt-oss no Groq) emitem tool calling nativa mesmo quando a API não
     # declara ferramentas — o servidor então rejeita (HTTP 400 "tool choice is none"). Enviar
     # `tools: []` + `tool_choice: "none"` força texto puro (protocolo de ações do JARVIS).
@@ -186,6 +191,12 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
                 openai_compat_bruto.get(
                     "piso_max_tokens_raciocinio",
                     ConfiguracaoOpenAiCompat().piso_max_tokens_raciocinio,
+                )
+            ),
+            historico_teto_tokens=int(
+                openai_compat_bruto.get(
+                    "historico_teto_tokens",
+                    ConfiguracaoOpenAiCompat().historico_teto_tokens,
                 )
             ),
             desabilitar_ferramentas_nativas=bool(

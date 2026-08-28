@@ -117,6 +117,63 @@ def test_modelo_sem_raciocinio_preserva_max_tokens() -> None:
     assert transporte.chamadas[0][1]["max_tokens"] == 2048
 
 
+def test_historico_comprime_quando_estoura_teto() -> None:
+    transporte = TransporteFalso(
+        [
+            _resposta("R1"),
+            _resposta("R2"),
+            _resposta("resumo do papo até aqui"),
+            _resposta("final"),
+        ]
+    )
+    provider = OpenAICompatProvider(modelo="qwen3:4b", historico_teto_tokens=6, _postar=transporte)
+
+    assert provider.enviar("mensagem um") == "R1"
+    assert provider.enviar("mensagem dois") == "R2"
+    assert provider.enviar("mensagem tres") == "final"
+
+    assert provider._mensagens[0]["role"] == "system"
+    assert "resumo do papo até aqui" in provider._mensagens[0]["content"]
+    assert provider._mensagens[1:] == [
+        {"role": "assistant", "content": "R2"},
+        {"role": "user", "content": "mensagem tres"},
+        {"role": "assistant", "content": "final"},
+    ]
+    post_resumo = transporte.chamadas[2][1]
+    assert "comprime conversas" in post_resumo["messages"][0]["content"]
+    assert "usuário: mensagem um" in post_resumo["messages"][1]["content"]
+
+
+def test_compressao_abandona_quando_resumo_vem_vazio() -> None:
+    transporte = TransporteFalso(
+        [
+            _resposta("R1"),
+            _resposta("R2"),
+            _resposta_sem_conteudo(),
+            _resposta("final"),
+        ]
+    )
+    provider = OpenAICompatProvider(modelo="qwen3:4b", historico_teto_tokens=6, _postar=transporte)
+
+    provider.enviar("mensagem um")
+    provider.enviar("mensagem dois")
+    assert provider.enviar("mensagem tres") == "final"
+
+    assert len(provider._mensagens) == 6
+    assert provider._mensagens[0] == {"role": "user", "content": "mensagem um"}
+
+
+def test_compressao_desligada_com_teto_zero() -> None:
+    transporte = TransporteFalso([_resposta("ok"), _resposta("ok"), _resposta("ok")])
+    provider = OpenAICompatProvider(modelo="qwen3:4b", historico_teto_tokens=0, _postar=transporte)
+
+    provider.enviar("mensagem um")
+    provider.enviar("mensagem dois")
+    provider.enviar("mensagem tres")
+
+    assert len(transporte.chamadas) == 3
+
+
 def test_prompt_sistema_vai_como_primeira_mensagem() -> None:
     transporte = TransporteFalso([_resposta("ok")])
     provider = OpenAICompatProvider(prompt_sistema="Você é o JARVIS.", _postar=transporte)
