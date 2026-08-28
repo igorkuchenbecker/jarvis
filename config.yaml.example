@@ -21,10 +21,10 @@ provedor:
     desabilitar_ferramentas_nativas: true  # envia tools: [] + tool_choice: none (alguns modelos emitem tool call nativa sem a API declará-la -> HTTP 400)
 
 limites:
-  max_iteracoes_por_objetivo: 12
-  timeout_por_passo_segundos: 60
-  teto_tokens_por_objetivo: 200000
-  teto_custo_usd_por_objetivo: 1.0
+  timeout_por_passo_segundos: 60  # p/ tools de sistema (terminal.exec)
+  max_iteracoes_por_turno: 12  # chamadas de ferramenta por turno (loop de ações)
+  max_reparos_por_turno: 2  # retries de formato inválido por turno
+  max_replanejamentos: 3  # replanejamentos de um objetivo em `jarvis run`
 
 seguranca:
   jail_paths:

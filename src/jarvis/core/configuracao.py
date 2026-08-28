@@ -49,6 +49,9 @@ class ConfiguracaoAutonomia:
 @dataclass(frozen=True)
 class ConfiguracaoLimites:
     timeout_por_passo_segundos: int = 60
+    max_iteracoes_por_turno: int = 12
+    max_reparos_por_turno: int = 2
+    max_replanejamentos: int = 3
 
 
 @dataclass(frozen=True)
@@ -198,6 +201,15 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
         limites=ConfiguracaoLimites(
             timeout_por_passo_segundos=limites_brutos.get(
                 "timeout_por_passo_segundos", padroes_limites.timeout_por_passo_segundos
+            ),
+            max_iteracoes_por_turno=limites_brutos.get(
+                "max_iteracoes_por_turno", padroes_limites.max_iteracoes_por_turno
+            ),
+            max_reparos_por_turno=limites_brutos.get(
+                "max_reparos_por_turno", padroes_limites.max_reparos_por_turno
+            ),
+            max_replanejamentos=limites_brutos.get(
+                "max_replanejamentos", padroes_limites.max_replanejamentos
             ),
         ),
         seguranca=ConfiguracaoSeguranca(

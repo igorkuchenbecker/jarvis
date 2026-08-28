@@ -128,6 +128,14 @@ configuração ativa no auto.info e provider padrão alternável, todos pós-1.0
 ### M3 — Sistema + segurança plena
 - `core/configuracao.py`: `Configuracao` ganhou `autonomia.nivel` e
   `limites.timeout_por_passo_segundos`; `seguranca` ganhou `allowlist_binarios`.
+
+### Pós-1.0 — limites do config.yaml lidos de verdade
+- `limites` agora tem `max_iteracoes_por_turno` (12), `max_reparos_por_turno` (2) e
+  `max_replanejamentos` (3) além do `timeout_por_passo_segundos` já existente — todos lidos de
+  `config.yaml` e aplicados de fato: `processar_turno` (conversa texto e voz) e `executar_objetivo`
+  (`jarvis run`) recebem esses valores em vez de defaults fixos. `config.yaml.example` sincronizado
+  (removidos campos de plano nunca implementados: `max_iteracoes_por_objetivo`,
+  `teto_tokens_por_objetivo`, `teto_custo_usd_por_objetivo`).
 - `security/allowlist.py`: `validar_binario_permitido()` — recusa binário fora da allowlist E
   recusa `sudo`/`su`/`doas`/`pkexec` sempre, mesmo que apareçam na allowlist do config.
 - `security/executor.py`: `Executor` ganhou `nivel_autonomia`, `allowlist_binarios` e

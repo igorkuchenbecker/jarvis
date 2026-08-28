@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from jarvis.core.loop import processar_turno
+from jarvis.core.loop import MAX_ITERACOES_PADRAO, MAX_REPAROS_PADRAO, processar_turno
 from jarvis.core.objetivos import RepositorioObjetivos, Subtarefa
 from jarvis.providers.base import ErroProvider, LLMProvider
 from jarvis.security.executor import Executor
@@ -105,6 +105,8 @@ def executar_objetivo(
     repositorio: RepositorioObjetivos,
     descricao_objetivo: str,
     max_replanejamentos: int = MAX_REPLANEJAMENTOS_PADRAO,
+    max_iteracoes: int = MAX_ITERACOES_PADRAO,
+    max_reparos: int = MAX_REPAROS_PADRAO,
     ao_progredir: Callable[[str], None] | None = None,
 ) -> ObjetivoConcluido:
     aviso = ao_progredir or (lambda mensagem: None)
@@ -132,6 +134,8 @@ def executar_objetivo(
             PROMPT_SUBTAREFA.format(
                 descricao=subtarefa.descricao, criterio_sucesso=subtarefa.criterio_sucesso
             ),
+            max_iteracoes=max_iteracoes,
+            max_reparos=max_reparos,
         )
         sucesso, detalhe = _avaliar_resultado_subtarefa(turno.resposta_final)
 

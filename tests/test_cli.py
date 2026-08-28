@@ -561,7 +561,7 @@ def test_comando_voz_falar_monta_providers_e_inicia_loop_quando_habilitada(
 
     chamadas: list[Any] = []
     monkeypatch.setattr(
-        cli, "_executar_conversa_voz", lambda *args: chamadas.append(args)
+        cli, "_executar_conversa_voz", lambda *args, **kwargs: chamadas.append(args)
     )
 
     cli._comando_voz_falar(argparse.Namespace())

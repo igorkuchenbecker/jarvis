@@ -154,3 +154,29 @@ def test_carregar_configuracao_le_secao_openai_compat_do_arquivo(tmp_path: Path)
     assert configuracao.openai_compat.timeout_segundos == 45
     assert configuracao.openai_compat.max_tokens == 16384
     assert configuracao.openai_compat.desabilitar_ferramentas_nativas is False
+
+
+def test_carregar_configuracao_le_limites_do_arquivo(tmp_path: Path) -> None:
+    caminho = tmp_path / "config.yaml"
+    caminho.write_text(
+        "limites:\n"
+        "  timeout_por_passo_segundos: 30\n"
+        "  max_iteracoes_por_turno: 6\n"
+        "  max_reparos_por_turno: 1\n"
+        "  max_replanejamentos: 5\n"
+    )
+    configuracao = carregar_configuracao(caminho)
+
+    assert configuracao.limites.timeout_por_passo_segundos == 30
+    assert configuracao.limites.max_iteracoes_por_turno == 6
+    assert configuracao.limites.max_reparos_por_turno == 1
+    assert configuracao.limites.max_replanejamentos == 5
+
+
+def test_carregar_configuracao_sem_arquivo_usa_padroes_de_limites(tmp_path: Path) -> None:
+    configuracao = carregar_configuracao(tmp_path / "inexistente.yaml")
+
+    assert configuracao.limites.timeout_por_passo_segundos == 60
+    assert configuracao.limites.max_iteracoes_por_turno == 12
+    assert configuracao.limites.max_reparos_por_turno == 2
+    assert configuracao.limites.max_replanejamentos == 3

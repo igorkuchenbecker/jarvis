@@ -10,7 +10,11 @@ from rich.markup import escape
 from rich.table import Table
 
 from jarvis.core.configuracao import Configuracao, carregar_configuracao
-from jarvis.core.loop import processar_turno
+from jarvis.core.loop import (
+    MAX_ITERACOES_PADRAO,
+    MAX_REPAROS_PADRAO,
+    processar_turno,
+)
 from jarvis.core.objetivos import RepositorioObjetivos
 from jarvis.core.planejador import executar_objetivo
 from jarvis.io.audio import (
@@ -161,10 +165,20 @@ def _comando_padrao(argumentos: argparse.Namespace) -> None:
     except ErroProvider as erro:
         console.print(f"[bold red]erro:[/bold red] {erro}")
         return
-    _executar_conversa(provider, executor)
+    _executar_conversa(
+        provider,
+        executor,
+        max_iteracoes=configuracao.limites.max_iteracoes_por_turno,
+        max_reparos=configuracao.limites.max_reparos_por_turno,
+    )
 
 
-def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) -> None:
+def _executar_conversa(
+    provider: LLMProvider,
+    executor: Executor | None = None,
+    max_iteracoes: int = MAX_ITERACOES_PADRAO,
+    max_reparos: int = MAX_REPAROS_PADRAO,
+) -> None:
     console.print(
         "[bold cyan]JARVIS[/bold cyan] — modo conversa. "
         "Digite 'sair' (ou Ctrl+C/Ctrl+D) para encerrar, 'reiniciar' para começar do zero.\n"
@@ -191,7 +205,13 @@ def _executar_conversa(provider: LLMProvider, executor: Executor | None = None) 
                 if executor is None:
                     resposta_final = provider.enviar(texto_usuario)
                 else:
-                    turno = processar_turno(provider, executor, texto_usuario)
+                    turno = processar_turno(
+                        provider,
+                        executor,
+                        texto_usuario,
+                        max_iteracoes=max_iteracoes,
+                        max_reparos=max_reparos,
+                    )
                     resposta_final = turno.resposta_final
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
@@ -213,6 +233,8 @@ def _executar_conversa_voz(
     tts: TTSProvider,
     duracao_captura_segundos: float,
     taxa_amostragem: int,
+    max_iteracoes: int = MAX_ITERACOES_PADRAO,
+    max_reparos: int = MAX_REPAROS_PADRAO,
 ) -> None:
     """Loop de conversa por voz push-to-talk (M8/V3): mesmo `processar_turno` com ferramentas
     usado pela conversa em texto (M2) — não é mais o LLM direto sem tool-calling cogitado
@@ -255,7 +277,13 @@ def _executar_conversa_voz(
 
         try:
             with console.status("[dim]pensando...[/dim]", spinner="dots"):
-                turno = processar_turno(provider, executor, texto_usuario)
+                turno = processar_turno(
+                    provider,
+                    executor,
+                    texto_usuario,
+                    max_iteracoes=max_iteracoes,
+                    max_reparos=max_reparos,
+                )
         except ErroProvider as erro:
             console.print(f"[bold red]erro:[/bold red] {erro}\n")
             continue
@@ -299,6 +327,8 @@ def _comando_voz_falar(argumentos: argparse.Namespace) -> None:
         tts,
         configuracao.voz.duracao_captura_segundos,
         configuracao.voz.taxa_amostragem,
+        max_iteracoes=configuracao.limites.max_iteracoes_por_turno,
+        max_reparos=configuracao.limites.max_reparos_por_turno,
     )
 
 
@@ -345,7 +375,14 @@ def _comando_run(argumentos: argparse.Namespace) -> None:
 
     try:
         resultado = executar_objetivo(
-            provider, executor, repositorio, argumentos.objetivo, ao_progredir=_mostrar_progresso
+            provider,
+            executor,
+            repositorio,
+            argumentos.objetivo,
+            max_replanejamentos=configuracao.limites.max_replanejamentos,
+            max_iteracoes=configuracao.limites.max_iteracoes_por_turno,
+            max_reparos=configuracao.limites.max_reparos_por_turno,
+            ao_progredir=_mostrar_progresso,
         )
     except ErroProvider as erro:
         console.print(f"[bold red]erro:[/bold red] {erro}")
