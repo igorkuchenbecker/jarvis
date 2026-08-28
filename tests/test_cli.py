@@ -306,11 +306,14 @@ def test_why_mostra_detalhes_do_registro_pedido(
         lambda: Configuracao(caminhos=ConfiguracaoCaminhos(auditoria_jsonl=caminho_auditoria)),
     )
 
-    cli._comando_why(argparse.Namespace(indice=1))
+    cli._comando_why(argparse.Namespace(indice=2))
 
     saida = capsys.readouterr().out
     assert "fs.write" in saida
     assert "b.txt" in saida
+
+    cli._comando_why(argparse.Namespace(indice=1))
+    assert "fs.read" in capsys.readouterr().out
 
 
 def test_why_indice_invalido_mostra_erro_amigavel(

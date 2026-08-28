@@ -482,7 +482,7 @@ def _comando_audit(argumentos: argparse.Namespace) -> None:
     tabela.add_column("duração (s)")
     for indice, registro in enumerate(registros, start=1):
         tabela.add_row(
-            str(indice),
+            str(registro.indice or indice),
             registro.quando,
             registro.acao,
             registro.resultado,
@@ -494,14 +494,15 @@ def _comando_audit(argumentos: argparse.Namespace) -> None:
 def _comando_why(argumentos: argparse.Namespace) -> None:
     configuracao = carregar_configuracao()
     registrador = RegistradorAuditoria(configuracao.caminhos.auditoria_jsonl)
-    registros = list(reversed(registrador.ler_todos()))
+    registro = next(
+        (r for r in registrador.ler_todos() if r.indice == argumentos.indice), None
+    )
 
-    if argumentos.indice < 1 or argumentos.indice > len(registros):
+    if registro is None:
         console.print(f"[bold red]erro:[/bold red] não há registro #{argumentos.indice}")
         return
 
-    registro = registros[argumentos.indice - 1]
-    console.print(f"[bold]#{argumentos.indice}[/bold] {registro.acao} em {registro.quando}")
+    console.print(f"[bold]#{registro.indice}[/bold] {registro.acao} em {registro.quando}")
     console.print(f"argumentos: {_seguro(registro.argumentos_seguros)}")
     console.print(f"resultado: {_seguro(registro.resultado)}")
     console.print(f"duração: {registro.duracao_segundos:.3f}s")

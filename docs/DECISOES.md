@@ -847,3 +847,19 @@ continua erro explícito. Suíte 318 passed. Versão `1.4.0` (continua).
 **Pendências das 9 melhorias (28/08):** (7) agendador — CONCLUÍDO acima; (8) `jarvis why` com
 índice estável entre sessões; (9) foco de janela por seletor no Hyprland. A ordem é fixa — cada
 uma só começa com o "Seguir" do usuário na sessão anterior.
+
+**2026-08-28** | Índice estável na auditoria — melhoria 8/9. Antes, `jarvis why <n>` era
+posição na listagem invertida, então cada entrada nova deslocava os índices (referência de ontem
+virava outra ação) | Alternativas: (a) manter posição invertida e documentar (rejeitado: o
+objetivo era exatamente alternar referência estável); (b) índice derivado da ordenação por
+`quando` (rejeitado: timestamps podem empatar/igualar e a ordem de arquivo é a verdadeira ordem
+append-only); (c) `indice` gravado na própria linha JSONL no `registrar()`, append-only, com
+`jarvis why` buscando pelo campo (ACEITO) | Forma de validar na prática: legado sem campo recebe
+ordem de posição (1..N) na leitura, nova entrada continua do máximo+1, e re-consultas repetem os
+mesmos índices; arquivo real com 101 registros legados validado com a CLI. Suíte 320 passed.
+Versão `1.4.0` (continua).
+
+**2026-08-28 (pendência)** | Melhoria 9/9: foco de janela por seletor no Hyprland. A API Lua
+desta build não respondeu de forma confiável (registrado no M9); alternativa MVP: `hyprctl
+dispatch focuswindow <seletor>`, ou listar janelas e usar `focuswindow address/class` filtrado
+pelo modelo. Só começa com o "Seguir" do usuário.

@@ -635,6 +635,17 @@ Testes: 12 novos em `tests/test_agendar.py` (units, OnCalendar, slug, sobrescrev
 remover, disparar, diárias/intervalos inválidos) + 1 em `tests/test_io_gdap.py` (degradação sem
 TTY). Suíte 318 passed.
 
+## Pós-1.0 — Índice estável na auditoria (`jarvis why`, a pedido do usuário)
+
+`jarvis why <n>` usava posição na listagem invertida — cada nova entrada deslocava os índices e
+uma referência de ontem apontava para outra ação hoje. Cada registro agora tem `indice` estável
+gravado na própria linha JSONL (append-only): `RegistroAuditoria.indice`, atribuído no `registrar`
+(= máximo atual + 1) e usado direto na busca; arquivos legados sem o campo recebem a ordem de
+posição (1..N), estável entre leituras. `jarvis why <n>` pesquisa pelo índice e `jarvis audit`
+mostra a coluna "#" com o índice estável (mais recentes primeiro). Validado na máquina com o
+arquivo real (legado, 101 registros): `audit` mostra 101/100/99..., `why 1` aponta para o primeiro
+registro e `why 999` responde erro limpo. Suíte 320 passed.
+
 ## Próximo passo
 
 **Roadmap M0-M10 completo.** Todos os marcos concluídos em 2026-08-23, na mesma sessão, a pedido
@@ -647,10 +658,9 @@ decisão unilateral desta sessão): multi-agent/supervisor, robótica, IoT/edge,
 quântica, mobile, UI web pesada, fine-tuning.
 
 Dívida técnica conhecida que sobrevive ao 1.0 (nenhuma bloqueante, todas registradas com motivo
-acima e em DECISOES.md): `jarvis why` usa índice não-estável entre sessões; `AnthropicProvider`
-não existe (`claude_cli` e `openai_compat` cobertos); streaming não implementado; foco de janela
-por seletor não suportado; `digitar()` só ASCII sem acentos; STT roda em CPU por escolha
-deliberada, não limitação.
+acima e em DECISOES.md): `AnthropicProvider` não existe (`claude_cli` e `openai_compat` cobertos);
+streaming não implementado; foco de janela por seletor não suportado; `digitar()` só ASCII sem
+acentos; STT roda em CPU por escolha deliberada, não limitação.
 
 Se uma sessão futura for retomar o projeto: ler este arquivo inteiro primeiro (fonte da verdade,
 não a memória de conversas passadas), rodar `scripts/check.sh` pra confirmar que ainda está
