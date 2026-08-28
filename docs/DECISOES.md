@@ -751,3 +751,33 @@ funcionar de ponta a ponta (cria fonte + ingere dado, que exige `dataset:write`)
 sanity-check manual confirmou que desfazer a correção faz o mesmo teste falhar com o erro real
 ("missing permission(s): source:write"). Suíte completa do GDAP (159 testes) verde depois da
 correção; nenhuma outra permissão/rota afetada.
+
+---
+
+**2026-08-28** | Provider ativo do JARVIS trocado de `claude_cli` para `openai_compat` contra um
+Ollama local (`http://localhost:11434/v1`, modelo `qwen3:4b`) | Usuário: "não quero que ele gaste
+tokens da minha assinatura Claude, de forma alguma". O `ClaudeCliProvider` invoca `claude -p`
+(Claude Code autenticado por OAuth com a conta Pro) e cada turno consome a cota da assinatura —
+não créditos de API. A intenção declarada do projeto ([31.3]) era "agente pessoal gratuito sem
+APIs com limitador", mas `claude_cli` gastava o Pro silenciosamente. Ollama é o único caminho
+para reasoning 100% offline (Second Brain é FTS5 local, mas decidir chamar ferramenta e
+interpretar resultado exige LLM) | Alternativas: (a) continuar `claude_cli` (banido pelo
+usuário: gasta Pro); (b) Groq/API externa (banida: limitador/rate limit + rede obrigatória);
+(c) desligar LLM e só expor `conhecimento.buscar` via CLI (perde o agente que responde —
+rejeitado: usuário quer conversar com o Second Brain offline); (d) Ollama com modelo maior
+`llama3.1:8b` (rejeitado: aperta os 6GB de VRAM da RTX 2060 e responde mais lento; `qwen3:4b`
+equilibra pt-BR/velocidade). Instalação do runtime: `pacman -S ollama-cuda` (repo
+cachyos-extra); o usuário `ollama` NÃO foi criado pelo hook do pacote — precisei de
+`systemd-sysusers /usr/lib/sysusers.d/ollama.conf` + `chown ollama:ollama /var/lib/ollama`
+(vizinho do mesmo problema do sudoers em [16]) | Consequências: reasoning local, sem internet e
+sem gastar o Pro; web (DuckDuckGo) segue disponível quando há conexão. `tools/web.py` passou a
+capturar `ErroBuscaWeb` e devolver mensagem amigável ("web indisponível (\<motivo>) — sem
+conexão não há busca web; use apenas o conhecimento local") em vez de falhar a ferramenta —
+`pesquisar` (SB primeiro) e `web.buscar` continuam funcionando offline com a mensagem no
+resultado. Visão (M7) fica indisponível sob `openai_compat` (só existe `ClaudeCliVisionProvider`,
+que gastaria Pro; usar Visão local exigiria um modelo VL no Ollama). `config.yaml` não é
+versionado por decisão anterior ([31.3]); o default embutido do código segue `claude_cli`, e
+quem não cria/edita `config.yaml` volta a gastar o Pro — documentado em PROJECT_STATE.md. Suíte
+270 passed (2 novos), ruff + mypy --strict limpos. Conversa real validada: `qwen3:4b` chamou
+`conhecimento.buscar` sozinho e respondeu sobre o Clean Code indexado no Second Brain, sem rede.
+Versão `1.3.3`.

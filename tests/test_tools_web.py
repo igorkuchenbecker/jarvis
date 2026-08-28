@@ -129,10 +129,29 @@ def test_executor_recusa_pesquisa_sem_consulta(tmp_path: Path) -> None:
     assert "consulta" in (resultado.erro or "")
 
 
-def test_erro_de_rede_vira_falha_amigavel_no_executor(tmp_path: Path) -> None:
+def test_erro_de_rede_vira_mensagem_amigavel_sem_falhar(tmp_path: Path) -> None:
     executor = _executor(tmp_path, AbrirFalso(falhar=True))
 
     resultado = executor.executar_acao(Acao("pesquisar", {"consulta": "algo novo"}))
 
-    assert not resultado.sucesso
-    assert "não consegui alcançar" in (resultado.erro or "")
+    assert resultado.sucesso
+    assert isinstance(resultado.valor, list)
+    assert resultado.valor and "web indisponível" in resultado.valor[0]
+
+
+def test_pesquisar_sem_rede_e_sem_conteudo_local_menciona_o_second_brain(tmp_path: Path) -> None:
+    ferramentas = _por_nome(_repositorio_vazio(tmp_path), AbrirFalso(falhar=True))
+
+    resultado = ferramentas["pesquisar"].executar({"consulta": "algo novo"})
+
+    assert isinstance(resultado, list)
+    assert resultado and "web indisponível" in resultado[0]
+
+
+def test_web_buscar_sem_rede_e_amigavel(tmp_path: Path) -> None:
+    ferramentas = _por_nome(_repositorio_vazio(tmp_path), AbrirFalso(falhar=True))
+
+    resultado = ferramentas["web.buscar"].executar({"consulta": "algo novo"})
+
+    assert isinstance(resultado, list)
+    assert resultado and "web indisponível" in resultado[0]

@@ -1,8 +1,9 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.3.2 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
+**Versão:** 1.3.3 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
 openai_compat, +jail de leitura ampliada, +integração GDAP, +busca web com Second Brain como
-fonte principal, +robustez openai_compat max_tokens/retry/sem tool calling, todos pós-1.0)
+fonte principal, +robustez openai_compat max_tokens/retry/sem tool calling, +modo 100% local
+com Ollama e web amigável offline, todos pós-1.0)
 **Última atualização:** 2026-08-28
 
 ## Feito
@@ -495,6 +496,35 @@ restaura o comportamento antigo), forçando o protocolo de ações em texto puro
 máquina: conversa real respondeu com resumo real do Second Brain (`pesquisar` chamado sozinho).
 
 4 + 2 testes novos; suíte 268 passed. Versões `1.3.1` e `1.3.2`.
+
+## Pós-1.0 — Modo 100% local (Ollama/qwen3) + web amigável offline (a pedido do usuário)
+
+Decisão do usuário: JARVIS NÃO deve consumir a assinatura Claude Pro (o `claude_cli` via
+`claude -p` gastava a cota OAuth da conta dele a cada turno) nem APIs externas com limitador.
+Provider ativo trocado no `config.yaml` (não versionado) de `claude_cli` →
+`openai_compat` apontando para um **Ollama local** (`http://localhost:11434/v1`, modelo
+`qwen3:4b`) — instalação: `sudo pacman -S ollama-cuda` (repo cachyos-extra, ~988MB), o usuário
+`ollama` do systemd-sysusers não era criado automaticamente (gerado com
+`sudo systemd-sysusers /usr/lib/sysusers.d/ollama.conf` + `chown ollama:ollama /var/lib/ollama`),
+serviço `systemctl enable --now ollama`, modelo `ollama pull qwen3:4b` (~2,5GB, GPU RTX 2060).
+
+O reasoning agora roda **na máquina, sem internet fixa**: o Second Brain (FTS5) é indexação
+local e o LLM local decide e responde offline. `tools/web.py` ganhou tratamento amigável de
+`ErroBuscaWeb`: sem conexão (ou DuckDuckGo inacessível), `pesquisar` e `web.buscar` devolvem a
+mensagem "web indisponível (\<motivo>) — sem conexão não há busca web; use apenas o conhecimento
+local (Second Brain)" em vez de falharem — o agente segue respondendo com o que o conhecimento
+local tiver. `config.yaml.example` ainda tem `llm_padrao: claude_cli` como padrão embutido do
+código (preservado); quem não tiver `config.yaml` continua caindo no Pro até configurar.
+
+Validado na máquina, ponta a ponta: conversa real pergunta "o que o meu Second Brain sabe sobre
+código limpo?" → `qwen3:4b` local chamou `conhecimento.buscar` sozinho e respondeu com os 17
+capítulos do Clean Code indexados — zero uso de rede/Pro no raciocínio. Suíte 270 passed
+(+2 testes: rede fora vira resultado amigável, sem falhar). Versão `1.3.3`.
+
+**Atentar**: o processo `jarvis` aberto antes da troca de config continua usando o provider
+antigo até ser reiniciado (só o config.yaml é lido na inicialização). Visão (M7) depende do
+`ClaudeCliVisionProvider` — não é coberta pelo Ollama local (qwen3:4b é só texto); `vision.analyze`
+fica indisponível com `llm_padrao: openai_compat` (provê compatível exigiria um modelo VL).
 
 ## Próximo passo
 

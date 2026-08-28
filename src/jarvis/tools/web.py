@@ -6,17 +6,23 @@ fonte principal de resposta é sempre o Second Brain do usuário. `web.buscar` f
 separada para pesquisa web explícita (conteúdo externo que o conhecimento local não cobre).
 
 Ambas são READ_ONLY; o transporte de rede vive em `io/web.py` e é injetável nos testes
-(abrir=None usa a rede real). Erros de rede propagam como `ErroBuscaWeb` e são convertidos
-em falha pelo executor — nada aqui decide permissão.
+(abrir=None usa a rede real). Sem internet (ou DuckDuckGo inacessível) a falha de rede é
+convertida em mensagem amigável — o agente segue respondendo com o que o conhecimento local
+tiver, em vez de a ferramenta falhar. Nada aqui decide permissão.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from jarvis.io.web import Transporte, buscar_web
+from jarvis.io.web import ErroBuscaWeb, Transporte, buscar_web
 from jarvis.memory.conhecimento import RepositorioConhecimento
 from jarvis.tools.base import Ferramenta, NivelRisco
+
+MENSAGEM_SEM_CONEXAO = (
+    "web indisponível ({motivo}) — sem conexão não há busca web; use apenas o "
+    "conhecimento local (Second Brain)"
+)
 
 SCHEMA_BUSCAR = {
     "type": "object",
@@ -32,10 +38,16 @@ SCHEMA_BUSCAR = {
 def _formatar_resultados_web(
     consulta: str, limite: int, timeout: int, abrir: Transporte | None
 ) -> list[str]:
+    try:
+        resultados = buscar_web(consulta, limite=limite, timeout=timeout, abrir=abrir)
+    except ErroBuscaWeb as erro:
+        return [MENSAGEM_SEM_CONEXAO.format(motivo=erro)]
+    if not resultados:
+        return [f"web sem resultados para: {consulta}"]
     return [
         f"web: {resultado.titulo} — {resultado.url}."
         + (f" {resultado.trecho}" if resultado.trecho else "")
-        for resultado in buscar_web(consulta, limite=limite, timeout=timeout, abrir=abrir)
+        for resultado in resultados
     ]
 
 
