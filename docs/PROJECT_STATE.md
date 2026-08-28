@@ -252,8 +252,8 @@ configuração ativa no auto.info e provider padrão alternável, todos pós-1.0
   `clicar(botao)`, `digitar(texto)` (ASCII simples, sem acentos — limitação real de XKB/evdev,
   documentada), `tecla(combinacao)` (ex.: "ctrl+c", "alt+f4", suporta modificadores + tecla).
 - `io/janelas.py`: `listar_janelas()` via `hyprctl clients -j`/`activewindow -j` (JSON, só
-  leitura). Foco de janela por seletor NÃO implementado — testado e confirmado não confiável
-  nesta build do Hyprland (ver DECISOES.md), registrado como pendência conhecida.
+  leitura). `focar_janela(seletor)` implementado DEPOIS do M9 (ver seção "Pós-1.0 — Foco de
+  janela por seletor"), resolvendo a pendência que existiu aqui.
 - `tools/computador.py`: `computador.listar_janelas` (READ_ONLY), `computador.mover_mouse`
   (MEDIUM), `computador.clicar`/`computador.digitar`/`computador.tecla` (**CRITICAL — primeiro
   uso real desse nível de risco no projeto**, resolvendo a dívida técnica do M3). Todas atrás de
@@ -445,9 +445,8 @@ confirmada por um humano ao rodar `jarvis voz check`.
 
 - CRITICAL agora TEM ferramentas reais (M9: `computador.clicar`/`digitar`/`tecla`) e exercício
   real via `scripts/validar_computador_real.py` — dívida resolvida.
-- Foco de janela por seletor (classe/endereço/título) não é suportado — só listagem. A API Lua
-  desta build do Hyprland não respondeu de forma confiável para isso (ver DECISOES.md, M9). Não
-  bloqueante: o agente pode listar e agir fisicamente sem trocar foco automaticamente.
+- Foco de janela por seletor (classe/endereço/título) era pendência do M9 — RESOLVIDO depois do
+  M10 (ver seção "Pós-1.0 — Foco de janela por seletor" e DECISOES.md).
 - `digitar()` só suporta ASCII simples, sem acentos — limitação real de evdev/XKB (ver
   DECISOES.md, M9), não uma omissão descuidada.
 - `jarvis why` identifica o registro pelo índice de exibição (1 = mais recente), não por um ID
@@ -646,6 +645,28 @@ mostra a coluna "#" com o índice estável (mais recentes primeiro). Validado na
 arquivo real (legado, 101 registros): `audit` mostra 101/100/99..., `why 1` aponta para o primeiro
 registro e `why 999` responde erro limpo. Suíte 320 passed.
 
+## Pós-1.0 — Foco de janela por seletor (Hyprland, a pedido do usuário)
+
+`io/janelas.py::focar_janela(seletor)` + ferramenta `computador.focar_janela` (MEDIUM, mesma
+gate `computador.habilitada` da lista do M9). Pendência do M9 resolvida depois de se descobrir o
+caminho certo para esta build do Hyprland (a "não confiável" era mito da investigação inicial —
+ver DECISOES.md para a radiografia):
+
+1. Enumera as janelas pela API Lua (`hl.get_windows()` via `hyprctl eval`, com o "truque do
+   error": a build não expõe valor de retorno do eval, então o chunk termina em `error(s)` e a
+   lista sai no corpo da mensagem; rc=7); endereços Lua == `hyprctl clients -j` (mesmo namespace).
+2. Resolve o seletor no índice (match em Python: `address:` sem `0x`, `class:` exata,
+   `title:` substring, nome livre = classe exata ou substring de classe/título).
+3. Dispara `hyprctl dispatch 'hl.dsp.focus({window=hl.get_windows()[N]})'` — a primitiva que de
+   verdade muda o foco.
+4. Fallback para Hyprland sem API Lua: `hyprctl dispatch focuswindow <seletor>` clássico.
+
+Seletores: `address:0x...`, `class:<nome>` (`class:(nome)` aceito, parênteses removidos),
+`title:<trecho>`, ou nome livre. Erro limpo quando nenhuma janela casa. 14 testes novos em
+`tests/test_io_janelas.py` (+ ajustes em `tests/test_computador.py`); suíte 333 passed. Validado
+na máquina real: `class:discord`, `title:LKS`, `class:app.zen_browser.zen` e `address:` (do
+`listar_janelas`) focam de verdade e o foco volta; seletor inexistente responde erro limpo.
+
 ## Próximo passo
 
 **Roadmap M0-M10 completo.** Todos os marcos concluídos em 2026-08-23, na mesma sessão, a pedido
@@ -659,8 +680,8 @@ quântica, mobile, UI web pesada, fine-tuning.
 
 Dívida técnica conhecida que sobrevive ao 1.0 (nenhuma bloqueante, todas registradas com motivo
 acima e em DECISOES.md): `AnthropicProvider` não existe (`claude_cli` e `openai_compat` cobertos);
-streaming não implementado; foco de janela por seletor não suportado; `digitar()` só ASCII sem
-acentos; STT roda em CPU por escolha deliberada, não limitação.
+streaming não implementado; `digitar()` só ASCII sem acentos; STT roda em CPU por escolha
+deliberada, não limitação. (Foco de janela por seletor saiu desta lista — resolvido pós-1.0.)
 
 Se uma sessão futura for retomar o projeto: ler este arquivo inteiro primeiro (fonte da verdade,
 não a memória de conversas passadas), rodar `scripts/check.sh` pra confirmar que ainda está

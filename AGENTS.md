@@ -111,10 +111,22 @@ registrados em `docs/DECISOES.md`). `io/entrada.py` (mover_mouse/clicar/digitar/
 projeto). Tudo atrás de `computador.habilitada` (`false` por padrão) além da aprovação
 interativa que HIGH/CRITICAL já exigem sempre.
 
-Foco de janela por seletor (não só listagem) ficou de fora — a API Lua desta build do Hyprland
-não respondeu de forma confiável para isso em teste manual (só foco por direção funcionou de
-verdade). `digitar()` só suporta ASCII sem acentos (limitação real de evdev/XKB, não descuido).
-Ambos registrados como pendência conhecida em `docs/PROJECT_STATE.md`, não bloqueantes.
+Foco de janela por seletor (não só listagem) ficou de fora do M9 — a investigação inicial da API
+Lua desta build foi inconclusiva — e foi RESOLVIDO depois (ver "Pós-1.0 — Foco de janela por
+seletor (Hyprland)"). `digitar()` só suporta ASCII sem acentos (limitação real de evdev/XKB, não
+descuido). Ambos registrados como pendência conhecida em `docs/PROJECT_STATE.md`, não bloqueantes.
+
+## Pós-1.0 — Foco de janela por seletor (Hyprland)
+
+`io/janelas.py::focar_janela(seletor)` + ferramenta `computador.focar_janela` (MEDIUM, atrás da
+mesma `computador.habilitada` do M9). Nesta build o dispatch é roteado por uma camada Lua, então
+o caminho é: (1) enumera janelas via `hl.get_windows()` (`hyprctl eval` com o "truque do error" —
+a build não expõe valor de retorno do eval; o chunk termina em `error(s)` e a lista sai no corpo;
+rc=7), endereços == `hyprctl clients -j`; (2) resolve o seletor no índice e dispara
+`hyprctl dispatch 'hl.dsp.focus({window=hl.get_windows()[N]})'` — a primitiva que muda o foco.
+Fallback clássico (`dispatch focuswindow`) só para build sem API Lua (`SemApiLua`). Seletores:
+`address:0x...`, `class:` exata (`class:(x)` aceito), `title:` substring, nome livre. Radiografia
+de todos os caminhos descartados (IIFE, eval sandbox, `{window="0x..."}`) em `docs/DECISOES.md`.
 
 ## M10 — Integração 1.0 (concluído)
 
@@ -288,3 +300,18 @@ objetivos READ_ONLY concluem automaticamente. `systemctl` é injetável nos test
 (`SistemaSystemctl: Callable[[list[str]], str]`). Detalhe herdado da validação real: processos
 sem TTY e sem `GDAP_API_KEY` degradam (stderr + sem ferramentas `gdap.*`) em vez de quebar o
 startup. 12 testes em `tests/test_agendar.py`; suíte 318 passed. Versão `1.4.0`.
+
+## Pós-1.0 — Foco de janela por seletor (Hyprland)
+
+`io/janelas.py::focar_janela(seletor)` + ferramenta `computador.focar_janela` (MEDIUM, atrás da
+mesma `computador.habilitada` do M9), resolvendo a pendência do M9. Nesta build o dispatch é
+roteado por uma camada Lua, então o caminho é: (1) enumera janelas via `hl.get_windows()`
+(`hyprctl eval` com o "truque do error" — a build não expõe valor de retorno do eval; o chunk
+termina em `error(s)` e a lista sai no corpo da mensagem; rc=7), endereços == `hyprctl clients -j`;
+(2) resolve o seletor no índice em Python e dispara
+`hyprctl dispatch 'hl.dsp.focus({window=hl.get_windows()[N]})'` — a primitiva que muda o foco de
+verdade. Fallback clássico (`dispatch focuswindow`) só para build sem API Lua (`SemApiLua`).
+Seletores: `address:0x...` (com ou sem `0x`), `class:` exata (`class:(x)` tem parênteses
+removidos), `title:` substring, nome livre. Radiografia de todos os caminhos descartados (IIFE,
+eval sandbox, `{window="0x..."}`) em `docs/DECISOES.md`. 14 testes em `tests/test_io_janelas.py`;
+suíte 333 passed. Versão `1.4.0`.

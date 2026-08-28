@@ -9,7 +9,8 @@ docs/DECISOES.md.
 
 `computador.listar_janelas` é READ_ONLY (só lê estado via hyprctl, sem side effects). Mover o
 mouse sem clicar é MEDIUM (raramente causa efeito real por si só, mas já é ação física visível na
-sessão do usuário, mais que um LOW comum).
+sessão do usuário, mais que um LOW comum). Mesma lógica para `computador.focar_janela`: muda o
+foco do teclado, ação visível mas de baixa consequência.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 from jarvis.io.entrada import clicar, digitar, mover_mouse, tecla
-from jarvis.io.janelas import listar_janelas
+from jarvis.io.janelas import focar_janela, listar_janelas
 from jarvis.tools.base import Ferramenta, NivelRisco
 
 SCHEMA_VAZIO = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -55,6 +56,15 @@ SCHEMA_TECLA = {
         "combinacao": {"type": "string"},
     },
     "required": ["combinacao"],
+    "additionalProperties": False,
+}
+
+SCHEMA_FOCAR_JANELA = {
+    "type": "object",
+    "properties": {
+        "seletor": {"type": "string"},
+    },
+    "required": ["seletor"],
     "additionalProperties": False,
 }
 
@@ -97,6 +107,12 @@ def _computador_tecla(argumentos: dict[str, Any]) -> str:
     return f"tecla '{combinacao}' pressionada"
 
 
+def _computador_focar_janela(argumentos: dict[str, Any]) -> str:
+    seletor = argumentos["seletor"]
+    focar_janela(seletor)
+    return f"foco movido para '{seletor}'"
+
+
 def criar_ferramentas_computador() -> list[Ferramenta]:
     return [
         Ferramenta(
@@ -135,5 +151,17 @@ def criar_ferramentas_computador() -> list[Ferramenta]:
             risco=NivelRisco.CRITICAL,
             schema_argumentos=SCHEMA_TECLA,
             executar=_computador_tecla,
+        ),
+        Ferramenta(
+            nome="computador.focar_janela",
+            descricao=(
+                "Move o foco do teclado para a janela que casa com o seletor do "
+                "hyprctl (ex.: 'address:0x...','class:(kitty)','class:(^brave$)', "
+                "'title:Terminal'). Use computador.listar_janelas antes para descobrir "
+                "o seletor."
+            ),
+            risco=NivelRisco.MEDIUM,
+            schema_argumentos=SCHEMA_FOCAR_JANELA,
+            executar=_computador_focar_janela,
         ),
     ]

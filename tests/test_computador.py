@@ -21,6 +21,7 @@ def test_todos_os_niveis_de_risco_estao_corretos() -> None:
     assert ferramentas["computador.clicar"].risco == NivelRisco.CRITICAL
     assert ferramentas["computador.digitar"].risco == NivelRisco.CRITICAL
     assert ferramentas["computador.tecla"].risco == NivelRisco.CRITICAL
+    assert ferramentas["computador.focar_janela"].risco == NivelRisco.MEDIUM
 
 
 def test_listar_janelas_delega_para_io_janelas(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,3 +83,17 @@ def test_tecla_delega_para_io_entrada(monkeypatch: pytest.MonkeyPatch) -> None:
     _ferramentas()["computador.tecla"].executar({"combinacao": "ctrl+c"})
 
     assert chamadas == ["ctrl+c"]
+
+
+def test_focar_janela_delega_para_io_janelas(monkeypatch: pytest.MonkeyPatch) -> None:
+    chamadas: list[str] = []
+    monkeypatch.setattr(
+        "jarvis.tools.computador.focar_janela", lambda seletor: chamadas.append(seletor)
+    )
+
+    resultado = _ferramentas()["computador.focar_janela"].executar(
+        {"seletor": "class:(kitty)"}
+    )
+
+    assert chamadas == ["class:(kitty)"]
+    assert "class:(kitty)" in resultado

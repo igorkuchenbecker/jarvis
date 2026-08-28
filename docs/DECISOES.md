@@ -845,8 +845,9 @@ universais do fish → `GDAP_API_KEY` faltando quebrava o startup antes de qualq
 continua erro explícito. Suíte 318 passed. Versão `1.4.0` (continua).
 
 **Pendências das 9 melhorias (28/08):** (7) agendador — CONCLUÍDO acima; (8) `jarvis why` com
-índice estável entre sessões; (9) foco de janela por seletor no Hyprland. A ordem é fixa — cada
-uma só começa com o "Seguir" do usuário na sessão anterior.
+índice estável entre sessões — CONCLUÍDO acima; (9) foco de janela por seletor no Hyprland —
+CONCLUÍDO abaixo, encerrando a série. A ordem era fixa — cada uma só começou com o "Seguir" do
+usuário na sessão anterior.
 
 **2026-08-28** | Índice estável na auditoria — melhoria 8/9. Antes, `jarvis why <n>` era
 posição na listagem invertida, então cada entrada nova deslocava os índices (referência de ontem
@@ -859,7 +860,29 @@ ordem de posição (1..N) na leitura, nova entrada continua do máximo+1, e re-c
 mesmos índices; arquivo real com 101 registros legados validado com a CLI. Suíte 320 passed.
 Versão `1.4.0` (continua).
 
-**2026-08-28 (pendência)** | Melhoria 9/9: foco de janela por seletor no Hyprland. A API Lua
-desta build não respondeu de forma confiável (registrado no M9); alternativa MVP: `hyprctl
-dispatch focuswindow <seletor>`, ou listar janelas e usar `focuswindow address/class` filtrado
-pelo modelo. Só começa com o "Seguir" do usuário.
+**2026-08-28** | Foco de janela por seletor no Hyprland — melhoria 9/9 (fecha a série). O
+relato do M9 ("API Lua não confiável") era mito de investigação inicial — radiografia REAL desta
+build (CachyOS, Hyprland com dispatch roteado por Lua) descartou caminho por caminho:
+
+| Caminho | Resultado REAL |
+|---|---|
+| `hyprctl dispatch focuswindow <seletor>` | QUebra: o dispatch embrulha o argumento em `hl.dispatch(...)` (camada Lua) e o dispatch clássico vira erro Lua (`')' expected near 'address'`) |
+| `hyprctl dispatch` + IIFE `(function() ... end)()` com `hl.dsp.focus` dentro | O IIFE chega a EXECUTAR (erro interno meu aparecia), mas a expressão retorna nil → `hl.dispatch: expected a dispatcher (e.g. hl.dsp.window.close())`, e o foco NÃO muda |
+| `hyprctl eval '<chunk>'` com `hl.dsp.focus({window=...})` | Roda em sandbox: o dispatch não surte efeito (`ok`, rc=0, foco intacto); `eval` também não devolve valor no stdout ("ok" sempre) |
+| `hyprctl dispatch 'hl.dsp.focus({window=hl.get_windows()[i]})'` | ✅ FUNCIONA — a primitiva que muda o foco de verdade (1-based) |
+| `hl.dsp.focus({window="0x..."})` / `{window=0x<num>}` | "window not found" — aceita só objeto de `hl.get_windows()` |
+| `{window={class=...}}` | "expected a window object or selector" — nada de seletor dentro do focus |
+
+Endereços de `hl.get_windows()` == `hyprctl clients -j` (mesmo namespace; o registro antigo de
+namespaces diferentes estava errado — era truncamento de print). O erro Lua sai com rc=7 e a
+mensagem vem toda no STDOUT (`error: [string "..."]:N: corpo`), com o corpo multi-linha; o
+`eval` nunca devolve valor, então o "truque do error" (`error(s)` no fim do chunk) vaza a
+enumeração pelo corpo da mensagem | Decidido: `focar_janela` em 2 passos — (1) enumera via
+`hl.get_windows()` (mesma fonte onde `dsp.focus` procura, um único namespace) e resolve o
+seletor no índice; (2) dispara `hl.dsp.focus({window=hl.get_windows()[N]})`. Fallback clássico
+(`dispatch focuswindow`) só para build sem API Lua (`SemApiLua`, detectada por "global 'hl'"/"nil
+value"/invalid command). Seletores: `address:` (aceita `0x`), `class:` exata (`class:(x)` tem os
+parênteses removidos), `title:` substring, livre = classe exata ou substring de classe/título.
+`focar_janela` virou a ferramenta `computador.focar_janela` (MEDIUM, atrás da mesma
+`computador.habilitada` de M9). Validado na máquina real com foco que muda e volta + erro limpo
+para seletor inexistente. Suíte 333 passed. Versão `1.4.0` (continua).
