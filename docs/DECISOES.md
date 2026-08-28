@@ -800,3 +800,19 @@ CRITICAL sempre exigem, fail-closed sem callback). Não há push automático —
 continua à escolha do usuário. 19 testes novos em `tests/test_tools_autor.py` cobrem parsing,
 confinamento, rollback, bloqueio com mudanças locais, fetch sem internet e o gating HIGH/CRITICAL do
 Executor. Suíte 289 passed, ruff + mypy --strict limpos. Versão `1.4.0`.
+
+**2026-08-28** | Parsing de ação tolerante a formatos nativos de tool-call no
+`core/loop.py::_extrair_acao` | Com o Ollama local, a conversa real "quais foram as últimas
+mudanças no seu software?" respondeu `{"tool": "auto.mudancas", "args": {"limite": 5}}` — o qwen3:4b
+não seguiu o protocolo do projeto (`{"tipo":"acao","ferramenta":...,"argumentos":{...}}`) e, como o
+parse exigia o formato canônico, o JSON foi tratado como resposta final e nada executou | Alternativas:
+(a) exibir erro ao usuário quando o formato vier errado (rejeitado: quebra o loop num modelo
+pequeno que driftou legitimamente para o formato em que foi treinado); (b) aceitar só o canônico e
+reforçar o prompt (insuficiente sozinho — modelos <7B driftam); (c) normalizar os formatos comuns
+`tool`/`args`, `tool`/`arguments`, `{type:function,function:{name,arguments}}` (string JSON),
+`function_call`, `name`/`parameters`, preservando o canônico (ACEITO) | Consequências: o loop agora
+roda os formatos nativos mesmo quando o modelo não segue o prompt; o prompt em `io/cli.py` também
+ganhou reforço explícito ("use 'tipo', 'ferramenta' e 'argumentos' — nunca 'tool', 'name', 'args' ou
+'parameters'"), mas o parse tolerante é a defesa real. Tests parametrizados para os 3 formatos
+nativos + garantia de que JSON de texto normal não vira ação. Suíte 293 passed, ruff + mypy --strict
+limpos. Versão `1.4.0` (continua).

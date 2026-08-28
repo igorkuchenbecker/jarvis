@@ -559,6 +559,13 @@ bloqueio com mudanças locais, fetch sem internet, pull quando atrasado, commit,
 recusando HIGH sem aprovação / rodando com aprovação / recusando schema inválido. Suíte 289 passed
 (ruff + mypy --strict + pytest). Versão `1.4.0`.
 
+Correção no mesmo dia: o qwen3:4b driftou para o formato nativo de tool-call
+(`{"tool": ..., "args": ...}`) numa conversa real, e o `_extrair_acao` (que só aceitava
+`{"tipo":"acao",...}`) tratou o JSON como resposta final sem executar nada. `_extrair_acao` agora
+normaliza os formatos comuns (`tool`/`args`, `tool`/`arguments`, `{type:function,function:{...}}`,
+`function_call`) além do canônico, e o prompt do sistema ganhou reforço das chaves exatas. Suíte
+293 passed.
+
 **Atentar**: quem rodar `auto.atualizar` deve reiniciar a sessão do `jarvis` depois (o provider e o
 pacote novos só são lidos/carregados na inicialização). Visão (M7) segue dependente do
 `ClaudeCliVisionProvider` — não coberta pelo Ollama local.

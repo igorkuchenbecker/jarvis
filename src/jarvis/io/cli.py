@@ -59,6 +59,8 @@ PROMPT_SISTEMA_COM_FERRAMENTAS = (
     "Você pode usar ferramentas para agir de verdade no sistema. Para usar uma, responda SOMENTE "
     'com um JSON exatamente neste formato, sem nenhum texto antes ou depois:\n'
     '{{"tipo": "acao", "ferramenta": "<nome>", "argumentos": {{...}}}}\n'
+    "Use as chaves EXATAS 'tipo', 'ferramenta' e 'argumentos' — nunca 'tool', 'name', "
+    "'args' ou 'parameters'.\n"
     "Ferramentas disponíveis:\n{ferramentas}\n"
     "Para perguntas de conhecimento, responda preferencialmente com base no Second Brain "
     "(conhecimento.buscar/pesquisar); use a web (web.buscar) só para o que o conhecimento "

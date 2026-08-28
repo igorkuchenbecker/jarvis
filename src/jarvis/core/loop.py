@@ -40,6 +40,24 @@ class TurnoConcluido:
     acoes_executadas: list[Acao] = field(default_factory=list)
 
 
+def _argumentos_de(bloco: dict[Any, Any]) -> dict[str, object]:
+    for chave in ("argumentos", "args", "arguments", "parametros", "parameters"):
+        if chave in bloco and bloco[chave] is not None:
+            brutos = bloco[chave]
+            break
+    else:
+        return {}
+    if isinstance(brutos, dict):
+        return dict(brutos)
+    if isinstance(brutos, str):
+        try:
+            decodificados = json.loads(brutos)
+        except json.JSONDecodeError:
+            return {}
+        return dict(decodificados) if isinstance(decodificados, dict) else {}
+    return {}
+
+
 def _extrair_acao(resposta: str) -> dict[str, object] | None:
     texto = resposta.strip()
     if texto.startswith("```"):
@@ -52,9 +70,20 @@ def _extrair_acao(resposta: str) -> dict[str, object] | None:
     except json.JSONDecodeError:
         return None
 
-    if isinstance(dado, dict) and dado.get("tipo") == "acao":
-        return dado
-    return None
+    if not isinstance(dado, dict):
+        return None
+
+    bloco: dict[Any, Any] = dado
+    if dado.get("type") == "function" and isinstance(dado.get("function"), dict):
+        bloco = dado["function"]
+    elif isinstance(dado.get("function_call"), dict):
+        bloco = dado["function_call"]
+
+    nome = bloco.get("ferramenta") or bloco.get("tool") or bloco.get("name")
+    if not isinstance(nome, str) or not nome:
+        return None
+
+    return {"tipo": "acao", "ferramenta": nome, "argumentos": _argumentos_de(bloco)}
 
 
 def processar_turno(
