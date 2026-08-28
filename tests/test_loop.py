@@ -142,3 +142,71 @@ def test_json_de_texto_normal_nao_vira_acao(tmp_path: Path) -> None:
 
     assert turno.resposta_final == '{"cidade": "Brasília", "pais": "Brasil"}'
     assert turno.acoes_executadas == []
+
+
+def test_acao_com_json_truncado_e_reparada(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    provider = FakeProvider(
+        [
+            '{"tipo": "acao", "ferramenta": "fs.list", "argu',
+            _json_acao("fs.list", caminho=str(tmp_path)),
+            "O único arquivo é a.txt.",
+        ]
+    )
+    executor = _executor_fs(tmp_path)
+
+    turno = processar_turno(provider, executor, "liste os arquivos")
+
+    assert turno.resposta_final == "O único arquivo é a.txt."
+    assert [acao.ferramenta for acao in turno.acoes_executadas] == ["fs.list"]
+    assert "protocolo de ação" in provider.historico[1]
+
+
+def test_acao_reparada_no_formato_nativo(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    provider = FakeProvider(
+        [
+            '{"tool": "fs.list", "args": {"caminho": "',
+            _json_acao("fs.list", caminho=str(tmp_path)),
+            "O único arquivo é a.txt.",
+        ]
+    )
+    executor = _executor_fs(tmp_path)
+
+    turno = processar_turno(provider, executor, "liste os arquivos")
+
+    assert [acao.ferramenta for acao in turno.acoes_executadas] == ["fs.list"]
+
+
+def test_reparo_esgota_e_responde_depois(tmp_path: Path) -> None:
+    executor = _executor_fs(tmp_path)
+    provider = FakeProvider(
+        [
+            '{"tool": "fs.list", "args"',
+            '{"tool": "fs.list", "args"',
+            "ok, sem ferramenta.",
+        ]
+    )
+
+    turno = processar_turno(provider, executor, "liste os arquivos", max_reparos=2)
+
+    assert turno.acoes_executadas == []
+    assert turno.resposta_final == "ok, sem ferramenta."
+    assert "protocolo de ação" in provider.historico[1]
+    assert "protocolo de ação" in provider.historico[2]
+
+
+def test_reparo_desativado_com_max_reparos_zero(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    provider = FakeProvider(
+        [
+            '{"tool": "fs.list", "args": {"caminho": "',
+            _json_acao("fs.list", caminho=str(tmp_path)),
+        ]
+    )
+    executor = _executor_fs(tmp_path)
+
+    turno = processar_turno(provider, executor, "liste os arquivos", max_reparos=0)
+
+    assert turno.acoes_executadas == []
+    assert turno.resposta_final.startswith('{"tool": "fs.list"')

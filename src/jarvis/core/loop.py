@@ -17,6 +17,15 @@ from jarvis.providers.base import LLMProvider
 from jarvis.security.executor import Acao, Executor
 
 MAX_ITERACOES_PADRAO = 12
+MAX_REPAROS_PADRAO = 2
+
+MENSAGEM_REPARO = (
+    "Sua última resposta não seguiu o protocolo de ação do JARVIS. Se quiser usar uma "
+    'ferramenta, responda SOMENTE com um JSON exatamente neste formato, sem texto antes ou '
+    'depois e sem crases: {{"tipo": "acao", "ferramenta": "<nome>", "argumentos": {{...}}}}. '
+    'Use as chaves exatas "tipo", "ferramenta" e "argumentos" — não use "tool", "name", '
+    '"args" ou "parameters".'
+)
 
 
 def _formatar_valor_para_llm(valor: Any) -> str:
@@ -86,18 +95,52 @@ def _extrair_acao(resposta: str) -> dict[str, object] | None:
     return {"tipo": "acao", "ferramenta": nome, "argumentos": _argumentos_de(bloco)}
 
 
+def _parece_tentativa_de_acao(resposta: str) -> bool:
+    """Detecta resposta que parece chamada de ferramenta malformada (p/ dar chance de corrigir)."""
+    texto = resposta.strip()
+    if texto.startswith("```"):
+        texto = texto.strip("`").strip()
+    if not (texto.startswith("{") or texto.startswith("[")):
+        return False
+    tem_marcas = any(
+        marca in texto
+        for marca in (
+            '"ferramenta"',
+            '"argu"',
+            '"tool"',
+            '"tipo"',
+            '"function"',
+            '"name"',
+            '"parameters"',
+        )
+    )
+    if tem_marcas:
+        return True
+    try:
+        json.loads(texto)
+    except json.JSONDecodeError:
+        return True
+    return False
+
+
 def processar_turno(
     provider: LLMProvider,
     executor: Executor,
     mensagem_usuario: str,
     max_iteracoes: int = MAX_ITERACOES_PADRAO,
+    max_reparos: int = MAX_REPAROS_PADRAO,
 ) -> TurnoConcluido:
     acoes_executadas: list[Acao] = []
+    reparos_restantes = max_reparos
     resposta = provider.enviar(mensagem_usuario)
 
     for _ in range(max_iteracoes):
         dado_acao = _extrair_acao(resposta)
         if dado_acao is None:
+            if reparos_restantes > 0 and _parece_tentativa_de_acao(resposta):
+                reparos_restantes -= 1
+                resposta = provider.enviar(MENSAGEM_REPARO)
+                continue
             return TurnoConcluido(resposta_final=resposta, acoes_executadas=acoes_executadas)
 
         argumentos_brutos = dado_acao.get("argumentos") or {}

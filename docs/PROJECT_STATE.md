@@ -563,15 +563,18 @@ Correção no mesmo dia: o qwen3:4b driftou para o formato nativo de tool-call
 (`{"tool": ..., "args": ...}`) numa conversa real, e o `_extrair_acao` (que só aceitava
 `{"tipo":"acao",...}`) tratou o JSON como resposta final sem executar nada. `_extrair_acao` agora
 normaliza os formatos comuns (`tool`/`args`, `tool`/`arguments`, `{type:function,function:{...}}`,
-`function_call`) além do canônico, e o prompt do sistema ganhou reforço das chaves exatas. Suíte
-293 passed.
+`function_call`) além do canônico, e o prompt do sistema ganhou reforço das chaves exatas. Além
+disso, `processar_turno` ganhou **retry de formato** (`max_reparos`, padrão 2): resposta que parece
+chamada de ferramenta malformada (JSON truncado, chaves erradas) recebe uma mensagem corretiva e o
+turno continua em vez de virar resposta final. Suíte 297 passed.
 
 **Benchmark de aderência** (`scripts/benchmark_aderencia.py`): roda conversas reais contra o
 provider ativo (Ollama local) para 6 perguntas golden e mede quantas vezes o modelo seguiu o
 protocolo (formato da 1ª resposta e se executou a ferramenta esperada automaticamente). Resultado
 na máquina com qwen3:4b: **12/12 (100%) canônico** — reforço de prompt + parse tolerante
 eliminaram o drift observado antes; o script vira teste de regressão manual p/ futuras trocas de
-modelo (substituição por `qwen3:8b`/`llama3.1:8b` deve começar rodando o benchmark).
+modelo (substituição por `qwen3:8b`/`llama3.1:8b` deve começar rodando o benchmark). Suíte 297
+passed.
 
 **Atentar**: quem rodar `auto.atualizar` deve reiniciar a sessão do `jarvis` depois (o provider e o
 pacote novos só são lidos/carregados na inicialização). Visão (M7) segue dependente do
