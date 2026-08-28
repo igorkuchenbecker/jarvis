@@ -70,6 +70,53 @@ def test_base_url_com_barra_final_nao_duplica_barra() -> None:
     assert transporte.chamadas[0][0] == "http://localhost:11434/v1/chat/completions"
 
 
+def test_modelo_de_raciocinio_aplica_piso_de_max_tokens() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(
+        modelo="qwen3:4b", max_tokens=2048, piso_max_tokens_raciocinio=16384, _postar=transporte
+    )
+
+    provider.enviar("oi")
+
+    assert transporte.chamadas[0][1]["max_tokens"] == 16384
+
+
+def test_modelo_de_raciocinio_respeita_max_tokens_maior_que_o_piso() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(
+        modelo="qwen3:4b", max_tokens=32768, piso_max_tokens_raciocinio=16384, _postar=transporte
+    )
+
+    provider.enviar("oi")
+
+    assert transporte.chamadas[0][1]["max_tokens"] == 32768
+
+
+def test_piso_desligado_mantem_max_tokens_em_modelo_de_raciocinio() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(
+        modelo="qwen3:4b", max_tokens=2048, piso_max_tokens_raciocinio=0, _postar=transporte
+    )
+
+    provider.enviar("oi")
+
+    assert transporte.chamadas[0][1]["max_tokens"] == 2048
+
+
+def test_modelo_sem_raciocinio_preserva_max_tokens() -> None:
+    transporte = TransporteFalso([_resposta("ok")])
+    provider = OpenAICompatProvider(
+        modelo="llama3.3:latest",
+        max_tokens=2048,
+        piso_max_tokens_raciocinio=16384,
+        _postar=transporte,
+    )
+
+    provider.enviar("oi")
+
+    assert transporte.chamadas[0][1]["max_tokens"] == 2048
+
+
 def test_prompt_sistema_vai_como_primeira_mensagem() -> None:
     transporte = TransporteFalso([_resposta("ok")])
     provider = OpenAICompatProvider(prompt_sistema="Você é o JARVIS.", _postar=transporte)

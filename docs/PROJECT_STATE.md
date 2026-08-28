@@ -484,10 +484,15 @@ conteúdo textual`. Causa raiz: o provider não enviava `max_tokens`; o default 
 em modelos reasoning (`openai/gpt-oss-120b` emite um campo `reasoning`) estourava o teto às
 vezes e `content` voltava `null` (HTTP 200 sem conteúdo). Correção: `max_tokens` configurável
 (`provedor.openai_compat.max_tokens`, default 8192, `0` desliga) + retry automático de 2
-tentativas para resposta sem conteúdo + erro final com dica sobre `max_tokens`. Bug latente
-corrigido de quebra: falha de extração de conteúdo passou a remover a mensagem do usuário do
-histórico (antes só falhas HTTP faziam isso). Validado na máquina real: conversa real respondeu
-com conteúdo e o modelo "se autocorrigiu" após uma ferramenta ser bloqueada pelo jail.
+ tentativas para resposta sem conteúdo + erro final com dica sobre `max_tokens`. Bug latente
+ corrigido de quebra: falha de extração de conteúdo passou a remover a mensagem do usuário do
+ histórico (antes só falhas HTTP faziam isso). Validado na máquina real: conversa real respondeu
+ com conteúdo e o modelo "se autocorrigiu" após uma ferramenta ser bloqueada pelo jail.
+
+ Complemento: `piso_max_tokens_raciocinio` (padrão 16384, `0` = sem piso) aplica um teto mínimo
+ efetivo em famílias que emitem `reasoning` antes do `content` (qwen3, gpt-oss, deepseek-r1...),
+ de modo que um `max_tokens` baixo não corte a resposta no meio de uma ação (`content` segue
+ sendo o valor maior entre os dois). O piso não impede `max_tokens` explícito maior.
 
 Bug 1.3.2 (sequência, mesma noite): a conversa real passou a responder HTTP 400 `tool_use_failed`
 ("Tool choice is none, but model called a tool") — o `gpt-oss-120b` do Groq emite tool calling

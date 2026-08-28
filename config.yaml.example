@@ -17,6 +17,7 @@ provedor:
     api_key_env: ""  # nome da var de ambiente com a chave (ex: GROQ_API_KEY); vazio = sem auth (Ollama)
     timeout_segundos: 120
     max_tokens: 8192  # teto de tokens de saída; modelos com raciocínio (ex: gpt-oss no Groq) estouram o default do servidor e voltam vazios
+    piso_max_tokens_raciocinio: 16384  # mínimo garantido p/ modelos que emitem `reasoning` antes do `content` (qwen3, gpt-oss, deepseek-r1...); 0 = sem piso
     desabilitar_ferramentas_nativas: true  # envia tools: [] + tool_choice: none (alguns modelos emitem tool call nativa sem a API declará-la -> HTTP 400)
 
 limites:

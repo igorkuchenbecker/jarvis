@@ -30,6 +30,11 @@ class ConfiguracaoOpenAiCompat:
     # default do servidor (baixo) a resposta pode vir com `content` vazio. 0 = não enviar o
     # campo (usa o default do servidor).
     max_tokens: int = 8192
+    # Modelos com raciocínio (qwen3, gpt-oss, deepseek-r1...) emitem um campo `reasoning` que
+    # consome do teto ANTES do `content`; se o ceiling ficar baixo demais, `content` vem vazio
+    # ou cortado no meio de uma ação. Este piso garante um mínimo para esses modelos (0 = sem
+    # piso). O valor de `max_tokens` acima, quando explicitamente maior, continua valendo.
+    piso_max_tokens_raciocinio: int = 16384
     # Alguns modelos (ex.: gpt-oss no Groq) emitem tool calling nativa mesmo quando a API não
     # declara ferramentas — o servidor então rejeita (HTTP 400 "tool choice is none"). Enviar
     # `tools: []` + `tool_choice: "none"` força texto puro (protocolo de ações do JARVIS).
@@ -173,6 +178,12 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
             timeout_segundos=int(openai_compat_bruto.get("timeout_segundos", 120)),
             max_tokens=int(
                 openai_compat_bruto.get("max_tokens", ConfiguracaoOpenAiCompat().max_tokens)
+            ),
+            piso_max_tokens_raciocinio=int(
+                openai_compat_bruto.get(
+                    "piso_max_tokens_raciocinio",
+                    ConfiguracaoOpenAiCompat().piso_max_tokens_raciocinio,
+                )
             ),
             desabilitar_ferramentas_nativas=bool(
                 openai_compat_bruto.get(

@@ -29,6 +29,27 @@ except importlib.metadata.PackageNotFoundError:
 
 USER_AGENT = f"jarvis/{VERSAO_JARVIS}"
 
+# Famílias de modelo que emitem um campo `reasoning` antes do `content`: consomem
+# do teto de max_tokens, então merecem um piso maior (ver piso_max_tokens_raciocinio).
+MODELOS_DE_RACIOCINIO = frozenset(
+    {
+        "qwen3",
+        "qwq",
+        "deepseek-r1",
+        "gpt-oss",
+        "kimi",
+        "glm-4.5",
+        "gemini-2.5",
+        "reasoning",
+        "thinking",
+    }
+)
+
+
+def _e_modelo_de_raciocinio(modelo: str) -> bool:
+    nome = modelo.lower()
+    return any(marca in nome for marca in MODELOS_DE_RACIOCINIO)
+
 
 def _postar_json(
     url: str, corpo: dict[str, Any], headers: dict[str, str], timeout: int
@@ -87,6 +108,7 @@ class OpenAICompatProvider:
         max_tokens: int = 8192,
         tentativas_sem_conteudo: int = 2,
         desabilitar_ferramentas_nativas: bool = True,
+        piso_max_tokens_raciocinio: int = 16384,
         _postar: Transporte | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -95,6 +117,12 @@ class OpenAICompatProvider:
         self._prompt_sistema = prompt_sistema
         self._api_key = api_key
         self._max_tokens = max_tokens
+        if (
+            max_tokens > 0
+            and piso_max_tokens_raciocinio > 0
+            and _e_modelo_de_raciocinio(modelo)
+        ):
+            self._max_tokens = max(max_tokens, piso_max_tokens_raciocinio)
         self._desabilitar_ferramentas_nativas = desabilitar_ferramentas_nativas
         self._tentativas_sem_conteudo = tentativas_sem_conteudo
         self._postar: Transporte = _postar or _postar_json
