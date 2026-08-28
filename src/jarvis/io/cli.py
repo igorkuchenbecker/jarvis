@@ -60,6 +60,9 @@ PROMPT_SISTEMA_COM_FERRAMENTAS = (
     'com um JSON exatamente neste formato, sem nenhum texto antes ou depois:\n'
     '{{"tipo": "acao", "ferramenta": "<nome>", "argumentos": {{...}}}}\n'
     "Ferramentas disponíveis:\n{ferramentas}\n"
+    "Para perguntas de conhecimento, responda preferencialmente com base no Second Brain "
+    "(conhecimento.buscar/pesquisar); use a web (web.buscar) só para o que o conhecimento "
+    "local não cobre.\n"
     "Se não precisar de nenhuma ferramenta, responda normalmente em texto, direto e conciso."
 )
 

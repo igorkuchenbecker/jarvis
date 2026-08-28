@@ -39,15 +39,18 @@ Você ──> jarvis ──> modelo de IA ──> executor valida schema/risco/c
 | `jarvis voz falar` | Conversa por voz push-to-talk (ENTER grava), com as mesmas ferramentas do modo texto |
 
 Ferramentas disponíveis: `fs.read/write/list`, `memory.store/search`, `sys.info`,
-`proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`
-e — com `computador.habilitada: true` — `computador.listar_janelas/mover_mouse/
-clicar/digitar/tecla`. Com `gdap.habilitada: true`, consulta o catálogo de dados e
-o analista de IA do [GDAP](https://github.com/igorkuchenbecker/gdap) e executa
+`proc.list`, `proc.kill`, `terminal.exec`, `conhecimento.buscar`, `vision.analyze`,
+`pesquisar` (Second Brain primeiro, web como fallback) e `web.buscar` (DuckDuckGo, sem
+chave de API) e — com `computador.habilitada: true` — `computador.listar_janelas/
+mover_mouse/clicar/digitar/tecla`. Com `gdap.habilitada: true`, consulta o catálogo de
+dados e o analista de IA do [GDAP](https://github.com/igorkuchenbecker/gdap) e executa
 pipelines cadastrados (allowlist por nome).
 
 - **Voz** (STT/TTS locais), **computer use** (mouse/teclado/janelas) e **GDAP** vêm
-  desligados por padrão; ligam por configuração
-- **247 testes offline** (fakes/mocks, zero rede); decisões técnicas registradas em
+  desligados por padrão; ligam por configuração. A **busca web** (`pesquisar`/`web.buscar`)
+  é READ_ONLY com DuckDuckGo (sem chave de API) e vem ligada — o Second Brain continua a
+  fonte principal: a web só é consultada quando o conhecimento local não responde.
+- **262 testes offline** (fakes/mocks, zero rede); decisões técnicas registradas em
   `docs/DECISOES.md`; estado atual e dívida técnica em `docs/PROJECT_STATE.md`
 
 ## Como rodar

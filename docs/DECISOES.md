@@ -4,6 +4,26 @@ Formato: data | decisão | motivo | alternativas consideradas | consequências
 
 ---
 
+**2026-08-28** | Busca web sem chave via DuckDuckGo HTML, com o Second Brain como fonte
+principal | O usuário pediu explicitamente que o JARVIS "possa pesquisar na Web, mas com o
+SecondBrain como fonte principal". DuckDuckGo HTML não exige chave/assinatura (zero custo,
+coerente com a filosofia do projeto "sem chave de API paga por padrão"); `urllib` + `html.parser`
+mantêm a política de zero dependência nova (mesmo espírito de `io/gdap.py`/`io/audio.py`).
+Para garantir "SB primeiro" em CÓDIGO e não por prompt (filosofia do executor: não confiar em
+instrução de texto), a ferramenta principal `pesquisar` consulta o FTS5 local e só chama a web
+quando não há resultado; `web.buscar` fica exposta separada para pesquisa web explícita.
+Propagandas do próprio DDG (alvos `duckduckgo.com/y.js`/links sem `uddg`, além de qualquer
+destino no próprio DuckDuckGo) são descartadas no parser | (a) usar a API oficial
+`duckduckgo_search`/`DDGS` — rejeitada por adicionar dependência e risco de bloqueio; (b) só a
+ferramenta `web.buscar` + instrução no prompt para preferir SB — rejeitada por não garantir a
+prioridade em código; (c) gate opt-in `web.habilitada: false` por padrão como computador/gdap —
+rejeitada: é READ_ONLY e sem custo/chave, então vem ligada por padrão com possibilidade de
+desligar | Ferramentas novas `pesquisar` e `web.buscar` (READ_ONLY), seção `web` no config.yaml
+(`habilitada`, `timeout_segundos`, `limite_padrao`), regra explícita "SB antes da web" no prompt
+do sistema, versão 1.3.0 com 15 testes novos (incl. prova de que `pesquisar` não toca a rede
+quando o SB responde). Validado E2E na máquina real. Nota pré-existente re-observada: citação
+`[arquivo § seção]` só mostra o basename — registrar como melhoria futura, não dívida nova.
+
 **2026-08-22** | Estrutura em `src/jarvis/` (src layout) em vez de pastas soltas na raiz | O
 master prompt nomeia um módulo `io`, que colidiria com o módulo `io` da stdlib do Python se
 ficasse solto no topo do sys.path; empacotar tudo sob `jarvis.io` elimina o conflito sem mudar

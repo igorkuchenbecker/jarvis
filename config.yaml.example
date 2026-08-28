@@ -48,6 +48,11 @@ caminhos:
 conhecimento:
   diretorios: []  # ex: ["~/Documentos"] — só o que estiver aqui pode ser indexado/consultado
 
+web:
+  habilitada: true  # pesquisar/web.buscar (DuckDuckGo, sem chave). Second Brain continua a fonte principal
+  timeout_segundos: 15
+  limite_padrao: 4
+
 computador:
   habilitada: false  # liga as ferramentas computador.* (mouse/teclado/janelas, M9)
   # CRITICAL: clicar/digitar/tecla sempre pedem aprovacao interativa, mesmo com isso ligado.

@@ -18,6 +18,7 @@ from jarvis.tools.memoria import criar_ferramentas_memoria
 from jarvis.tools.registro import RegistroFerramentas
 from jarvis.tools.sistema import criar_ferramentas_sistema
 from jarvis.tools.visao import criar_ferramentas_visao
+from jarvis.tools.web import criar_ferramentas_pesquisa
 
 __all__ = [
     "Ferramenta",
@@ -42,6 +43,14 @@ def criar_registro_ferramentas_padrao(configuracao: Configuracao) -> RegistroFer
     repositorio_conhecimento = RepositorioConhecimento(configuracao.caminhos.banco_dados)
     for ferramenta in criar_ferramentas_conhecimento(repositorio_conhecimento):
         registro.registrar(ferramenta)
+
+    if configuracao.web.habilitada:
+        for ferramenta in criar_ferramentas_pesquisa(
+            repositorio_conhecimento,
+            timeout_segundos=configuracao.web.timeout_segundos,
+            limite_padrao=configuracao.web.limite_padrao,
+        ):
+            registro.registrar(ferramenta)
 
     try:
         provider_visao = criar_provider_visao(configuracao)

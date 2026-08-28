@@ -1,8 +1,9 @@
 # Estado do projeto JARVIS
 
-**Versão:** 1.2.0 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
-openai_compat, +jail de leitura ampliada, +integração GDAP, todos pós-1.0)
-**Última atualização:** 2026-08-24
+**Versão:** 1.3.0 (M0-M10 concluídos — roadmap completo; +indicador de carregamento, +provider
+openai_compat, +jail de leitura ampliada, +integração GDAP, +busca web com Second Brain como
+fonte principal, todos pós-1.0)
+**Última atualização:** 2026-08-28
 
 ## Feito
 
@@ -447,6 +448,32 @@ confirmada por um humano ao rodar `jarvis voz check`.
   sequencialmente, mas não há um grafo de dependências declarado nem paralelismo).
 - `jarvis run` não tem um jeito de listar/cancelar um objetivo em andamento (só continua ou
   esgota `max_replanejamentos`).
+
+## Pós-1.0 — Busca web (Second Brain como fonte principal)
+
+`io/web.py` (transporte `urllib` stdlib + `html.parser`, zero dependência nova) consulta o
+DuckDuckGo HTML sem chave de API e devolve títulos/URLs/trechos orgânicos (propagandas —
+alvos `duckduckgo.com/y.js` ou links sem `uddg` — descartadas). `tools/web.py` expõe duas
+ferramentas READ_ONLY atrás do gate `web.habilitada` (`true` por padrão): `web.buscar` (web
+explícita) e `pesquisar` — a ferramenta principal de conhecimento, que consulta PRIMEIRO o
+Second Brain local (FTS5) e só cai na web quando não há resultado local, enforçado em código
+(não em prompt). O prompt do sistema ganhou a regra explícita de preferir o conhecimento local
+antes da web. `config.yaml`/`config.yaml.example` ganharam `web.timeout_segundos`/
+`web.limite_padrao`.
+
+Validado na máquina real ponta a ponta: conversa real com o provider Groq configurado do usuário
+rogou `pesquisar` sozinho para responder "o que o meu Second Brain sabe sobre código limpo?" e
+recebeu trechos citados `[arquivo § seção]` do índice real; numa segunda conversa a mesma
+ferramenta fez o fallback para a web (resultado orgânico de batente) — o passo seguinte foi
+barrado só pelo rate limit do provedor (HTTP 429), não por bug. 15 testes novos
+(`tests/test_io_web.py`, `tests/test_tools_web.py`), incl. o "malicioso" de recusa de schema e
+a prova de que `pesquisar` NÃO toca a rede quando o Second Brain responde. Versão `1.3.0`.
+
+Um comportamento observado no E2E (não é bug do web, é limitação pré-existente do M5): a citação
+`[arquivo § seção]` mostra só o nome do arquivo, então o modelo tentou abrir um caminho
+relativo errado com `fs.read`. Se reconstruir o caminho completo do arquivo citado for
+necessário, é mudança no formato da citação do `RepositorioConhecimento` — registrar como
+melhoria futura, não dívida desta fatia.
 
 ## Próximo passo
 

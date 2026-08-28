@@ -60,6 +60,13 @@ class ConfiguracaoComputador:
 
 
 @dataclass(frozen=True)
+class ConfiguracaoWeb:
+    habilitada: bool = True
+    timeout_segundos: int = 15
+    limite_padrao: int = 4
+
+
+@dataclass(frozen=True)
 class ConfiguracaoGdap:
     """GDAP (Global Data Automation Platform) é um projeto irmão em ~/gdap, rodando como
     servidor HTTP separado (`gdap system serve`). O JARVIS fala com ele só pela API HTTP dele
@@ -113,6 +120,7 @@ class Configuracao:
     conhecimento: ConfiguracaoConhecimento = field(default_factory=ConfiguracaoConhecimento)
     voz: ConfiguracaoVoz = field(default_factory=ConfiguracaoVoz)
     computador: ConfiguracaoComputador = field(default_factory=ConfiguracaoComputador)
+    web: ConfiguracaoWeb = field(default_factory=ConfiguracaoWeb)
     gdap: ConfiguracaoGdap = field(default_factory=ConfiguracaoGdap)
 
 
@@ -131,6 +139,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     conhecimento_bruto = bruto.get("conhecimento") or {}
     voz_bruta = bruto.get("voz") or {}
     computador_bruto = bruto.get("computador") or {}
+    web_bruta = bruto.get("web") or {}
     gdap_bruto = bruto.get("gdap") or {}
 
     padroes_caminhos = ConfiguracaoCaminhos()
@@ -139,6 +148,7 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
     padroes_autonomia = ConfiguracaoAutonomia()
     padroes_voz = ConfiguracaoVoz()
     padroes_computador = ConfiguracaoComputador()
+    padroes_web = ConfiguracaoWeb()
     padroes_gdap = ConfiguracaoGdap()
 
     return Configuracao(
@@ -210,6 +220,11 @@ def carregar_configuracao(caminho: Path = CAMINHO_CONFIG_PADRAO) -> Configuracao
         ),
         computador=ConfiguracaoComputador(
             habilitada=computador_bruto.get("habilitada", padroes_computador.habilitada),
+        ),
+        web=ConfiguracaoWeb(
+            habilitada=web_bruta.get("habilitada", padroes_web.habilitada),
+            timeout_segundos=int(web_bruta.get("timeout_segundos", padroes_web.timeout_segundos)),
+            limite_padrao=int(web_bruta.get("limite_padrao", padroes_web.limite_padrao)),
         ),
         gdap=ConfiguracaoGdap(
             habilitada=gdap_bruto.get("habilitada", padroes_gdap.habilitada),
