@@ -58,8 +58,8 @@ def test_ingerir_markdown_divide_por_cabecalho(tmp_path: Path) -> None:
     resultados = repositorio.buscar("instalar")
     assert len(resultados) == 1
     assert resultados[0].secao == "Instalação"
-    assert resultados[0].arquivo == "notas.md"
-    assert resultados[0].citacao() == "[notas.md § Instalação]"
+    assert resultados[0].arquivo == str(arquivo.resolve())
+    assert resultados[0].citacao() == f"[{arquivo.resolve()} § Instalação]"
 
 
 def test_ingerir_txt_e_um_trecho_unico_sem_secao(tmp_path: Path) -> None:
@@ -72,7 +72,7 @@ def test_ingerir_txt_e_um_trecho_unico_sem_secao(tmp_path: Path) -> None:
     resultados = repositorio.buscar("plantas")
     assert len(resultados) == 1
     assert resultados[0].secao == ""
-    assert resultados[0].citacao() == "[lembrete.txt]"
+    assert resultados[0].citacao() == f"[{arquivo.resolve()}]"
 
 
 def test_ingerir_pdf_extrai_texto_por_pagina(tmp_path: Path) -> None:
@@ -86,7 +86,7 @@ def test_ingerir_pdf_extrai_texto_por_pagina(tmp_path: Path) -> None:
     resultados = repositorio.buscar("conteudo")
     assert len(resultados) == 1
     assert resultados[0].secao == "página 1"
-    assert resultados[0].arquivo == "documento.pdf"
+    assert resultados[0].arquivo == str(arquivo.resolve())
 
 
 def test_reindexar_sem_mudanca_de_mtime_nao_duplica(tmp_path: Path) -> None:

@@ -145,6 +145,13 @@ configuração ativa no auto.info e provider padrão alternável, todos pós-1.0
   resumo vier vazio). Validado na máquina com qwen3:4b: histórico comprimido com sucesso.
   `historico_teto_tokens` baixo → compressão frequente, porém resumo granular demais; alto →
   risco de estourar o `num_ctx` do Ollama (4096 numa 4b padrão).
+
+### Pós-1.0 — citação com caminho real (conhecimento.buscar)
+- A citação `[arquivo § seção]` deixou de mostrar só o basename: agora mostra o caminho real
+  (abreviado como `~/...` quando dentro do home) — o modelo pode ler o trecho citado inteiro com
+  `fs.read`, que resolve `~` e valida contra o jail. Caminhos são normalizados com
+  `expanduser().resolve()` na ingestão. Validado na máquina: citar `~/second-brain/x.md` e ler o
+  arquivo citado via `fs.read` passa no executor.
 - `security/allowlist.py`: `validar_binario_permitido()` — recusa binário fora da allowlist E
   recusa `sudo`/`su`/`doas`/`pkexec` sempre, mesmo que apareçam na allowlist do config.
 - `security/executor.py`: `Executor` ganhou `nivel_autonomia`, `allowlist_binarios` e

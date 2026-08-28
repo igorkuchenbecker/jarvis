@@ -84,7 +84,7 @@ def test_pesquisar_usa_o_second_brain_e_nao_chama_a_web(tmp_path: Path) -> None:
     resultado = ferramentas["pesquisar"].executar({"consulta": "sqlite"})
 
     assert isinstance(resultado, list)
-    assert resultado and resultado[0].startswith("[notas.md § Banco de dados]:")
+    assert resultado and "notas.md § Banco de dados]" in resultado[0]
     assert "FTS5" in resultado[0]
     assert abrir.chamadas == []
 

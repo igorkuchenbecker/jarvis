@@ -29,8 +29,9 @@ def criar_ferramentas_conhecimento(repositorio: RepositorioConhecimento) -> list
             nome="conhecimento.buscar",
             descricao=(
                 "Busca trechos relevantes nos documentos locais indexados (.md/.txt/.pdf). "
-                "Cada resultado já vem no formato [arquivo § seção]: texto — cite exatamente "
-                "assim ao responder."
+                "Cada resultado já vem no formato [caminho § seção]: texto — o caminho entre "
+                "colchetes é real e pode ser lido com fs.read para contexto adicional; cite "
+                "exatamente assim ao responder."
             ),
             risco=NivelRisco.READ_ONLY,
             schema_argumentos=SCHEMA_BUSCAR,

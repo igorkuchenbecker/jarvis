@@ -16,6 +16,17 @@ from jarvis.memory._fts5 import construir_consulta_fts5
 EXTENSOES_SUPORTADAS = (".md", ".txt", ".pdf")
 
 
+def _caminho_de_exibicao(caminho_bruto: str) -> str:
+    """Caminho original abreviado para '~/...' quando estiver dentro do home — o modelo pode
+    ler o arquivo citado com fs.read (o caminho resolvido está no jail de leitura)."""
+    caminho = Path(caminho_bruto)
+    try:
+        relativo = caminho.relative_to(Path.home())
+    except ValueError:
+        return caminho.as_posix()
+    return f"~/{relativo.as_posix()}"
+
+
 @dataclass(frozen=True)
 class Trecho:
     arquivo: str
@@ -23,9 +34,10 @@ class Trecho:
     texto: str
 
     def citacao(self) -> str:
+        nome = _caminho_de_exibicao(self.arquivo)
         if self.secao:
-            return f"[{self.arquivo} § {self.secao}]"
-        return f"[{self.arquivo}]"
+            return f"[{nome} § {self.secao}]"
+        return f"[{nome}]"
 
 
 def _dividir_markdown_por_cabecalho(conteudo: str) -> list[tuple[str, str]]:
@@ -77,7 +89,7 @@ class RepositorioConhecimento:
         self._conexao.commit()
 
     def ingerir_arquivo(self, caminho: Path, forcar: bool = False) -> int:
-        caminho = caminho.resolve()
+        caminho = caminho.expanduser().resolve()
         mtime_atual = caminho.stat().st_mtime
         linha = self._conexao.execute(
             "SELECT mtime FROM conhecimento_arquivos WHERE caminho = ?", (str(caminho),)
@@ -118,7 +130,7 @@ class RepositorioConhecimento:
         except sqlite3.OperationalError:
             return []
         return [
-            Trecho(arquivo=Path(arquivo).name, secao=secao, texto=texto)
+            Trecho(arquivo=arquivo, secao=secao, texto=texto)
             for texto, arquivo, secao in cursor.fetchall()
         ]
 
